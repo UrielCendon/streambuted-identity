@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:identity_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # Disable RabbitMQ auto-configuration during tests
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+
+jwt:
+  secret: TestSecretKeyThatIsLongEnoughForHS512AlgorithmAndMustBeAtLeast512BitsLong!!!!!
+  access-token-expiry-ms: 900000
+  refresh-token-expiry-ms: 604800000
+
+messaging:
+  exchange:
+    identity: identity.events
+  routing-key:
+    user-promoted: user.promoted
+  queue:
+    user-promoted: identity.user.promoted
+
+grpc:
+  server:
+    port: -1  # Disable gRPC server in unit test context

@@ -1,0 +1,25 @@
+# Build output
+/target/
+.env
+
+# Maven helper files
+/.mvn/timing.properties
+/.flattened-pom.xml
+
+# Generated/local helper files
+/dependency-list.txt
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# IDEs/editors
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db

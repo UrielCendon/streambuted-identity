@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package streambuted.identity.grpc;
+
+option java_package = "streambuted.identity.grpc";
+option java_outer_classname = "TokenValidatorProto";
+option java_multiple_files = true;
+
+// TokenValidator is consumed by internal microservices (e.g. Streaming Service)
+// to verify a JWT and retrieve the caller's identity without going through REST.
+service TokenValidator {
+    rpc ValidateToken(TokenRequest) returns (TokenResponse);
+}
+
+message TokenRequest {
+    string token = 1;
+}
+
+message TokenResponse {
+    string user_id  = 1;
+    string role     = 2;
+    string email    = 3;
+    bool   is_active = 4;
+    bool   is_valid  = 5;   // false when the token is expired or malformed
+    string error_message = 6; // populated only when is_valid = false
+}
