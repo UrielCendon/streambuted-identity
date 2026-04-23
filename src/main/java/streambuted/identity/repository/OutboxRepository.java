@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 import streambuted.identity.domain.OutboxEntity;
 import streambuted.identity.domain.OutboxStatus;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,4 +16,6 @@ import java.util.UUID;
 public interface OutboxRepository extends JpaRepository<OutboxEntity, UUID> {
 
     List<OutboxEntity> findByStatusOrderByCreatedAtAsc(OutboxStatus status);
+
+    List<OutboxEntity> findByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(OutboxStatus status, Instant createdAt);
 }

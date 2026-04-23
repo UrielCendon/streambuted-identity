@@ -13,6 +13,7 @@ import streambuted.identity.messaging.IdentityEventPublisher;
 import streambuted.identity.messaging.UserPromotedEvent;
 import streambuted.identity.repository.OutboxRepository;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -25,6 +26,7 @@ import java.util.List;
 public class OutboxProcessor {
 
     private static final int MAX_RETRY_COUNT = 5;
+    private static final Duration FAILED_RETRY_MIN_AGE = Duration.ofHours(1);
 
     private final OutboxRepository outboxRepository;
     private final IdentityEventPublisher eventPublisher;
@@ -40,6 +42,34 @@ public class OutboxProcessor {
 
         for (OutboxEntity outboxEvent : pendingEvents) {
             processSingleEvent(outboxEvent);
+        }
+    }
+
+    @Scheduled(cron = "0 0 * * * *")
+    public void retryStaleFailedEvents() {
+        Instant cutoff = Instant.now().minus(FAILED_RETRY_MIN_AGE);
+        List<OutboxEntity> failedEvents =
+            outboxRepository.findByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(OutboxStatus.FAILED, cutoff);
+
+        if (failedEvents.isEmpty()) {
+            return;
+        }
+
+        for (OutboxEntity outboxEvent : failedEvents) {
+            outboxEvent.setStatus(OutboxStatus.PENDING);
+            outboxEvent.setRetryCount(0);
+
+            log.warn(
+                "Re-queueing stale FAILED outbox event id={} createdAt={} for another delivery cycle",
+                outboxEvent.getId(),
+                outboxEvent.getCreatedAt()
+            );
+        }
+
+        try {
+            outboxRepository.saveAll(failedEvents);
+        } catch (DataAccessException ex) {
+            log.error("Failed to persist stale FAILED outbox retries: {}", ex.getMessage(), ex);
         }
     }
 
@@ -76,11 +106,24 @@ public class OutboxProcessor {
     }
 
     private void markRetryOrFailed(OutboxEntity outboxEvent, String reason, Exception cause) {
+        boolean recoveredFromPreviousFailure =
+            outboxEvent.getStatus() == OutboxStatus.PENDING && outboxEvent.getProcessedAt() != null;
+
         outboxEvent.setRetryCount(outboxEvent.getRetryCount() + 1);
 
         if (outboxEvent.getRetryCount() >= MAX_RETRY_COUNT) {
             outboxEvent.setStatus(OutboxStatus.FAILED);
             outboxEvent.setProcessedAt(Instant.now());
+
+            if (recoveredFromPreviousFailure) {
+                log.error(
+                    "[OUTBOX-ALERT] Outbox event id={} failed again after recovery cycle (reason={}, retryCount={})",
+                    outboxEvent.getId(),
+                    reason,
+                    outboxEvent.getRetryCount(),
+                    cause
+                );
+            }
         } else {
             outboxEvent.setStatus(OutboxStatus.PENDING);
         }

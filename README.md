@@ -27,6 +27,7 @@ Microservicio de autenticación, autorización y gestión de usuarios de la plat
 |---|---|
 | [Dockerfile](Dockerfile) | Construye la imagen de la aplicación con multi-stage build y usuario no root |
 | [docker-compose.yml](docker-compose.yml) | Levanta PostgreSQL, RabbitMQ y identity-service en local |
+| [.env.example](.env.example) | Plantilla base de variables para crear tu `.env` local |
 | [.env](.env) | Variables de entorno locales que Docker Compose lee automáticamente desde esta carpeta |
 | [.dockerignore](.dockerignore) | Reduce el contexto de build de Docker |
 | [.gitignore](.gitignore) | Evita subir artefactos locales como `target/` y `.env` |
@@ -40,9 +41,10 @@ Nunca edites el secreto directamente en `application.yml`.
 
 ### Opción recomendada: Docker Desktop
 
-1. Crea un archivo [.env](.env) en esta misma carpeta.
-2. Define ahí tus variables reales.
-3. Ejecuta:
+1. Copia [.env.example](.env.example) a [.env](.env).
+2. Reemplaza en `.env` todos los valores `CHANGE_ME_*` por credenciales reales.
+3. Usa un `JWT_SECRET` de al menos 64 caracteres para HS512.
+4. Ejecuta:
 
 ```bash
 docker compose up --build
@@ -56,7 +58,7 @@ Con eso se levantan PostgreSQL, RabbitMQ y el identity-service juntos.
 - `DB_URL`: URL de PostgreSQL usada por Spring Boot.
 - `DB_USERNAME`: usuario de la base de datos.
 - `DB_PASSWORD`: contraseña de la base de datos.
-- `JWT_SECRET`: secreto HMAC para firmar y validar JWT.
+- `JWT_SECRET`: secreto HMAC para firmar y validar JWT (mínimo 64 caracteres para HS512).
 - `RABBITMQ_HOST`: host del broker RabbitMQ.
 - `RABBITMQ_PORT`: puerto AMQP del broker.
 - `RABBITMQ_USERNAME`: usuario AMQP.
