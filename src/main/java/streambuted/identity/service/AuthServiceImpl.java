@@ -29,7 +29,6 @@ import java.util.UUID;
 public class AuthServiceImpl implements AuthService {
 
     private final UserAccountRepository accountRepository;
-    private final UserProfileRepository profileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder        passwordEncoder;
     private final JwtService             jwtService;
@@ -87,9 +86,14 @@ public class AuthServiceImpl implements AuthService {
     // ── Refresh ───────────────────────────────────────────────────────────────
 
     @Override
-    public LoginResponse refresh(RefreshTokenRequest request) {
+    public LoginResponse refresh(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new InvalidRefreshTokenException();
+        }
+
+        String tokenValue = refreshToken.trim();
         RefreshTokenEntity storedToken = refreshTokenRepository
-            .findByTokenValue(request.refreshToken())
+            .findByTokenValue(tokenValue)
             .orElseThrow(InvalidRefreshTokenException::new);
 
         if (!storedToken.isValid()) {
@@ -103,6 +107,17 @@ public class AuthServiceImpl implements AuthService {
         UserAccountEntity account = storedToken.getAccount();
         log.info("Refresh token rotated for userId={}", account.getId());
         return buildTokenPair(account);
+    }
+
+    @Override
+    public void logout(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+
+        String tokenValue = refreshToken.trim();
+        long deletedRows = refreshTokenRepository.deleteByTokenValue(tokenValue);
+        log.info("Logout completed. Invalidated refresh token rows={}", deletedRows);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.*;
  *  - register(): success, duplicate email
  *  - login(): success, wrong password, inactive account, unknown email
  *  - refresh(): success (token rotation), expired token, revoked token, unknown token
+ *  - logout(): token invalidation by refresh token value
  *
  * All collaborators are mocked — no Spring context or database is started.
  */
@@ -35,7 +36,6 @@ import static org.mockito.Mockito.*;
 class AuthServiceImplTest {
 
     @Mock private UserAccountRepository  accountRepository;
-    @Mock private UserProfileRepository  profileRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private PasswordEncoder        passwordEncoder;
     @Mock private JwtService             jwtService;
@@ -250,15 +250,13 @@ class AuthServiceImplTest {
         @DisplayName("should rotate tokens and return new pair on success")
         void refresh_success_rotatesToken() {
             RefreshTokenEntity stored = validRefreshToken();
-            RefreshTokenRequest request = new RefreshTokenRequest(REFRESH_TOKEN);
-
             when(refreshTokenRepository.findByTokenValue(REFRESH_TOKEN)).thenReturn(Optional.of(stored));
             when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jwtService.generateAccessToken(activeAccount)).thenReturn(ACCESS_TOKEN);
             when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
             when(jwtService.getAccessTokenExpirySeconds()).thenReturn(EXPIRY_SECONDS);
 
-            LoginResponse response = authService.refresh(request);
+            LoginResponse response = authService.refresh(REFRESH_TOKEN);
 
             assertThat(stored.isRevoked()).isTrue();
             assertThat(response.accessToken()).isEqualTo(ACCESS_TOKEN);
@@ -271,11 +269,10 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("should throw InvalidRefreshTokenException when token does not exist")
         void refresh_unknownToken_throwsException() {
-            RefreshTokenRequest request = new RefreshTokenRequest("nonexistent-token");
             when(refreshTokenRepository.findByTokenValue("nonexistent-token"))
                 .thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> authService.refresh(request))
+            assertThatThrownBy(() -> authService.refresh("nonexistent-token"))
                 .isInstanceOf(InvalidRefreshTokenException.class);
         }
 
@@ -290,10 +287,9 @@ class AuthServiceImplTest {
                 .isRevoked(true)
                 .build();
 
-            RefreshTokenRequest request = new RefreshTokenRequest(REFRESH_TOKEN);
             when(refreshTokenRepository.findByTokenValue(REFRESH_TOKEN)).thenReturn(Optional.of(revoked));
 
-            assertThatThrownBy(() -> authService.refresh(request))
+            assertThatThrownBy(() -> authService.refresh(REFRESH_TOKEN))
                 .isInstanceOf(InvalidRefreshTokenException.class);
 
             verify(jwtService, never()).generateAccessToken(any());
@@ -310,13 +306,45 @@ class AuthServiceImplTest {
                 .isRevoked(false)
                 .build();
 
-            RefreshTokenRequest request = new RefreshTokenRequest(REFRESH_TOKEN);
             when(refreshTokenRepository.findByTokenValue(REFRESH_TOKEN)).thenReturn(Optional.of(expired));
 
-            assertThatThrownBy(() -> authService.refresh(request))
+            assertThatThrownBy(() -> authService.refresh(REFRESH_TOKEN))
                 .isInstanceOf(InvalidRefreshTokenException.class);
 
             verify(jwtService, never()).generateAccessToken(any());
+        }
+
+        @Test
+        @DisplayName("should throw InvalidRefreshTokenException when token is blank")
+        void refresh_blankToken_throwsException() {
+            assertThatThrownBy(() -> authService.refresh("  "))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+
+            verify(refreshTokenRepository, never()).findByTokenValue(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("logout()")
+    class LogoutTests {
+
+        @Test
+        @DisplayName("should delete refresh token row when token is provided")
+        void logout_deletesToken() {
+            when(refreshTokenRepository.deleteByTokenValue(REFRESH_TOKEN)).thenReturn(1L);
+
+            authService.logout(REFRESH_TOKEN);
+
+            verify(refreshTokenRepository).deleteByTokenValue(REFRESH_TOKEN);
+        }
+
+        @Test
+        @DisplayName("should be idempotent when token is null or blank")
+        void logout_blankToken_isNoop() {
+            authService.logout(null);
+            authService.logout(" ");
+
+            verify(refreshTokenRepository, never()).deleteByTokenValue(any());
         }
     }
 }

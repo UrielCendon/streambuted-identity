@@ -140,8 +140,9 @@ El servicio estará disponible en:
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `POST` | `/api/v1/auth/register` | Registro de nuevo usuario (rol: LISTENER) |
-| `POST` | `/api/v1/auth/login` | Login, retorna `accessToken` + `refreshToken` |
-| `POST` | `/api/v1/auth/refresh` | Rota el refresh token y emite un nuevo JWT |
+| `POST` | `/api/v1/auth/login` | Login, retorna `accessToken` en JSON y `refresh_token` en cookie HttpOnly |
+| `POST` | `/api/v1/auth/refresh` | Lee `refresh_token` desde cookie, rota token y emite nuevo `accessToken` |
+| `POST` | `/api/v1/auth/logout` | Limpia cookie `refresh_token` y elimina el token persistido |
 
 **Ejemplo — Register:**
 ```json
@@ -161,6 +162,37 @@ POST /api/v1/auth/register
   "role": "listener",
   "expiresIn": 900
 }
+```
+
+### Guía rápida Frontend (cookies + access token en memoria)
+
+1. Envía `POST /api/v1/auth/login` con `withCredentials: true` para que el navegador almacene la cookie HttpOnly `refresh_token`.
+2. Guarda únicamente `accessToken` en memoria (no en LocalStorage).
+3. Para renovar sesión, llama `POST /api/v1/auth/refresh` con `withCredentials: true` y sin body de refresh token.
+4. Para cerrar sesión, llama `POST /api/v1/auth/logout` con `withCredentials: true`.
+
+Ejemplo con Axios:
+
+```ts
+const loginResponse = await axios.post(
+  "/api/v1/auth/login",
+  { email, password },
+  { withCredentials: true }
+);
+
+const { accessToken } = loginResponse.data;
+
+const refreshResponse = await axios.post(
+  "/api/v1/auth/refresh",
+  {},
+  { withCredentials: true }
+);
+
+await axios.post(
+  "/api/v1/auth/logout",
+  {},
+  { withCredentials: true }
+);
 ```
 
 ### Usuarios (requieren Bearer JWT)

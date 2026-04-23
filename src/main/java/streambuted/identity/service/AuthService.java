@@ -25,5 +25,11 @@ public interface AuthService {
      * (token rotation — the old refresh token is revoked).
      * Throws InvalidRefreshTokenException if the token is expired or revoked.
      */
-    LoginResponse refresh(RefreshTokenRequest request);
+    LoginResponse refresh(String refreshToken);
+
+    /**
+     * Invalidates a refresh token during logout.
+     * This is idempotent to avoid leaking token existence.
+     */
+    void logout(String refreshToken);
 }

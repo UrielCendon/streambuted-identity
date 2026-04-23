@@ -18,6 +18,8 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshTokenEntity
 
     Optional<RefreshTokenEntity> findByTokenValue(String tokenValue);
 
+    long deleteByTokenValue(String tokenValue);
+
     /** Revokes all active refresh tokens belonging to a given account (logout-all). */
     @Modifying
     @Query("UPDATE RefreshTokenEntity r SET r.isRevoked = true WHERE r.account.id = :accountId AND r.isRevoked = false")

@@ -1,5 +1,7 @@
 package streambuted.identity.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 /**
  * Returned by POST /api/v1/auth/login and POST /api/v1/auth/refresh.
  *
@@ -8,6 +10,7 @@ package streambuted.identity.dto;
  * @param role         Resolved role from the user account (lowercase string).
  * @param expiresIn    Remaining lifetime of the access token in seconds.
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record LoginResponse(
     String accessToken,
     String refreshToken,
