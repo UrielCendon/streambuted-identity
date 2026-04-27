@@ -26,9 +26,6 @@ Microservicio de autenticación, autorización y gestión de usuarios de la plat
 | Archivo | Propósito |
 |---|---|
 | [Dockerfile](Dockerfile) | Construye la imagen de la aplicación con multi-stage build y usuario no root |
-| [docker-compose.yml](docker-compose.yml) | Levanta PostgreSQL, RabbitMQ y identity-service en local |
-| [.env.example](.env.example) | Plantilla base de variables para crear tu `.env` local |
-| [.env](.env) | Variables de entorno locales que Docker Compose lee automáticamente desde esta carpeta |
 | [.dockerignore](.dockerignore) | Reduce el contexto de build de Docker |
 | [.gitignore](.gitignore) | Evita subir artefactos locales como `target/` y `.env` |
 
@@ -41,17 +38,17 @@ Nunca edites el secreto directamente en `application.yml`.
 
 ### Opción recomendada: Docker Desktop
 
-1. Copia [.env.example](.env.example) a [.env](.env).
-2. Reemplaza en `.env` todos los valores `CHANGE_ME_*` por credenciales reales.
+1. Configura el archivo `.env` unificado en la raíz del repositorio (`StreamButed/.env`).
+2. Reemplaza en ese `.env` todos los valores `CHANGE_ME_*` por credenciales reales.
 3. Usa un `JWT_SECRET` de al menos 64 caracteres para HS512.
 4. Ejecuta:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
-Docker Compose carga automáticamente [.env](.env) cuando lo ejecutas desde esta carpeta.
-Con eso se levantan PostgreSQL, RabbitMQ y el identity-service juntos.
+Ejecuta el comando desde la **raíz del monorepo**. Con eso se levantan PostgreSQL, RabbitMQ,
+identity-service y catalog-service con una sola orquestación.
 
 ### Variables que usa la aplicación
 
@@ -104,7 +101,7 @@ automáticamente con `spring.jpa.hibernate.ddl-auto: update` en modo desarrollo.
 ### Con Docker Compose
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 Si quieres parar todo:
@@ -314,7 +311,6 @@ services/identity-service/
 ├── .dockerignore
 ├── .gitignore
 ├── Dockerfile
-├── docker-compose.yml
 ├── pom.xml
 ├── README.md
 └── src/

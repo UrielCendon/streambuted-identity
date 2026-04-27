@@ -29,6 +29,7 @@
         <postgresql.version>42.7.10</postgresql.version>
         <protobuf.plugin.version>0.6.1</protobuf.plugin.version>
         <os.plugin.version>1.7.1</os.plugin.version>
+        <lombok.version>1.18.34</lombok.version>
     </properties>
 
     <dependencies>
@@ -172,6 +173,28 @@
                     </excludes>
                 </configuration>
             </plugin>
+
+            <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.13.0</version>
+            <configuration>
+                <source>21</source>
+                <target>21</target>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
+                        <version>${lombok.version}</version>
+                    </path>
+                    <path>
+                        <groupId>org.hibernate.orm</groupId>
+                        <artifactId>hibernate-jpamodelgen</artifactId>
+                        <version>6.5.3.Final</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
 
             <!-- Compile .proto files and generate gRPC stubs -->
             <plugin>
