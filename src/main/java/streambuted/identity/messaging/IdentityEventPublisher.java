@@ -1,11 +1,18 @@
 package streambuted.identity.messaging;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
 
 /**
  * Publishes domain events from the Identity Service to RabbitMQ.
@@ -25,6 +32,11 @@ public class IdentityEventPublisher {
     @Value("${messaging.routing-key.user-promoted}")
     private String userPromotedRoutingKey;
 
+    @Value("${EVENT_SIGNING_SECRET:}")
+    private String eventSigningSecret;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     /**
      * Publishes a UserPromotedEvent to the identity.events exchange.
      * Downstream consumers (Catalog Service, Analytics Service) subscribe
@@ -34,7 +46,23 @@ public class IdentityEventPublisher {
      */
     public boolean publishUserPromoted(UserPromotedEvent event) {
         try {
-            rabbitTemplate.convertAndSend(identityExchange, userPromotedRoutingKey, event);
+            // Serialize the event to JSON to compute a stable HMAC signature
+            String payloadJson = objectMapper.writeValueAsString(event);
+
+            if (eventSigningSecret != null && !eventSigningSecret.isBlank()) {
+                String signature = computeHmacBase64(payloadJson, eventSigningSecret);
+
+                MessagePostProcessor mpp = (Message message) -> {
+                    message.getMessageProperties().setHeader("X-Event-Signature", signature);
+                    return message;
+                };
+
+                rabbitTemplate.convertAndSend(identityExchange, userPromotedRoutingKey, payloadJson, mpp);
+            } else {
+                // Fallback: publish without signature if secret is not configured
+                rabbitTemplate.convertAndSend(identityExchange, userPromotedRoutingKey, payloadJson);
+            }
+
             log.info("Published UserPromotedEvent for userId={}, eventId={}",
                 event.userId(), event.eventId());
             return true;
@@ -42,6 +70,17 @@ public class IdentityEventPublisher {
             log.error("Failed to publish UserPromotedEvent for userId={}: {}",
                 event.userId(), ex.getMessage(), ex);
             return false;
+        } catch (Exception ex) {
+            log.error("Failed to serialize/sign UserPromotedEvent for userId={}: {}",
+                event.userId(), ex.getMessage(), ex);
+            return false;
         }
+    }
+
+    private String computeHmacBase64(String payload, String secret) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+        byte[] sig = mac.doFinal(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(sig);
     }
 }
