@@ -10,6 +10,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import org.springframework.beans.factory.InitializingBean;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
@@ -18,11 +19,14 @@ import java.util.Base64;
  * Publishes domain events from the Identity Service to RabbitMQ.
  * The caller receives a boolean outcome so the outbox relay can decide
  * whether to retry or mark the row as processed.
+ *
+ * Requires EVENT_SIGNING_SECRET to be configured for HMAC signing.
+ * Fails on startup if the secret is missing or blank.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class IdentityEventPublisher {
+public class IdentityEventPublisher implements InitializingBean {
 
     private final RabbitTemplate rabbitTemplate;
 
@@ -37,6 +41,17 @@ public class IdentityEventPublisher {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        if (eventSigningSecret == null || eventSigningSecret.isBlank()) {
+            throw new IllegalArgumentException(
+                "EVENT_SIGNING_SECRET must be configured and non-empty. " +
+                "This environment variable is required for event signing security."
+            );
+        }
+        log.info("IdentityEventPublisher initialized with event signing enabled.");
+    }
+
     /**
      * Publishes a UserPromotedEvent to the identity.events exchange.
      * Downstream consumers (Catalog Service, Analytics Service) subscribe
@@ -49,19 +64,15 @@ public class IdentityEventPublisher {
             // Serialize the event to JSON to compute a stable HMAC signature
             String payloadJson = objectMapper.writeValueAsString(event);
 
-            if (eventSigningSecret != null && !eventSigningSecret.isBlank()) {
-                String signature = computeHmacBase64(payloadJson, eventSigningSecret);
+            // Always sign: afterPropertiesSet() guarantees eventSigningSecret is non-null and non-blank
+            String signature = computeHmacBase64(payloadJson, eventSigningSecret);
 
-                MessagePostProcessor mpp = (Message message) -> {
-                    message.getMessageProperties().setHeader("X-Event-Signature", signature);
-                    return message;
-                };
+            MessagePostProcessor mpp = (Message message) -> {
+                message.getMessageProperties().setHeader("X-Event-Signature", signature);
+                return message;
+            };
 
-                rabbitTemplate.convertAndSend(identityExchange, userPromotedRoutingKey, payloadJson, mpp);
-            } else {
-                // Fallback: publish without signature if secret is not configured
-                rabbitTemplate.convertAndSend(identityExchange, userPromotedRoutingKey, payloadJson);
-            }
+            rabbitTemplate.convertAndSend(identityExchange, userPromotedRoutingKey, payloadJson, mpp);
 
             log.info("Published UserPromotedEvent for userId={}, eventId={}",
                 event.userId(), event.eventId());
