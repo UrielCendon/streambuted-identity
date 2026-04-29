@@ -14,9 +14,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import streambuted.identity.dto.*;
 import streambuted.identity.security.JwtProperties;
+import streambuted.identity.security.RsaJwtKeyProvider;
 import streambuted.identity.service.AuthService;
 
 import java.time.Duration;
+import java.util.Map;
 
 /**
  * Handles public authentication endpoints under /api/v1/auth.
@@ -33,6 +35,7 @@ public class AuthController {
     private final AuthService authService;
     private final JwtProperties jwtProperties;
     private final Environment environment;
+    private final RsaJwtKeyProvider rsaJwtKeyProvider;
 
     @Value("${app.security.refresh-cookie.path:/api/v1/auth/refresh}")
     private String refreshCookiePath;
@@ -90,6 +93,16 @@ public class AuthController {
         authService.logout(refreshToken);
         clearRefreshTokenCookie(servletResponse);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /api/v1/auth/.well-known/jwks.json
+     * Publishes the JSON Web Key Set (JWKS) used by other services to validate
+     * access tokens locally (without a synchronous call per request).
+     */
+    @GetMapping("/.well-known/jwks.json")
+    public ResponseEntity<Map<String, Object>> jwks() {
+        return ResponseEntity.ok(rsaJwtKeyProvider.jwks());
     }
 
     private void attachRefreshTokenCookie(HttpServletResponse servletResponse, String refreshToken) {

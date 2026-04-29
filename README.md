@@ -8,7 +8,7 @@ Microservicio de autenticación, autorización y gestión de usuarios de la plat
 |---|---|
 | Runtime | Java 21 + Spring Boot 3.3 |
 | Base de datos | PostgreSQL 16+ |
-| Seguridad | Spring Security + JWT (HMAC-SHA512) |
+| Seguridad | Spring Security + JWT (RS256) + JWKS |
 | Protocolo externo | REST (HTTPS) bajo `/api/v1` |
 | Protocolo interno | gRPC en puerto 9091 |
 | Mensajería | Transactional Outbox + RabbitMQ (AMQP) |
@@ -40,8 +40,7 @@ Nunca edites el secreto directamente en `application.yml`.
 
 1. Configura el archivo `.env` unificado en la raíz del repositorio (`StreamButed/.env`).
 2. Reemplaza en ese `.env` todos los valores `CHANGE_ME_*` por credenciales reales.
-3. Usa un `JWT_SECRET` de al menos 64 caracteres para HS512.
-4. Ejecuta:
+3. Ejecuta:
 
 ```bash
 docker compose up -d --build
@@ -55,7 +54,10 @@ identity-service y catalog-service con una sola orquestación.
 - `DB_URL`: URL de PostgreSQL usada por Spring Boot.
 - `DB_USERNAME`: usuario de la base de datos.
 - `DB_PASSWORD`: contraseña de la base de datos.
-- `JWT_SECRET`: secreto HMAC para firmar y validar JWT (mínimo 64 caracteres para HS512).
+- `JWT_ISSUER`: valor del claim `iss` emitido en los access tokens.
+- `JWT_KEY_ID`: (opcional) `kid` usado en el header del JWT y en el JWKS.
+- `JWT_RSA_PRIVATE_KEY_PEM` / `JWT_RSA_PRIVATE_KEY_BASE64`: (opcional) clave privada RSA para firmar (PKCS#8).
+- `JWT_RSA_PUBLIC_KEY_PEM` / `JWT_RSA_PUBLIC_KEY_BASE64`: (opcional) clave pública RSA para publicar en JWKS (X.509). Si no se provee, puede derivarse de la privada.
 - `RABBITMQ_HOST`: host del broker RabbitMQ.
 - `RABBITMQ_PORT`: puerto AMQP del broker.
 - `RABBITMQ_USERNAME`: usuario AMQP.
@@ -63,6 +65,9 @@ identity-service y catalog-service con una sola orquestación.
 - `RABBITMQ_VHOST`: virtual host de RabbitMQ.
 - `SERVER_PORT`: puerto HTTP del servicio.
 - `GRPC_PORT`: puerto gRPC del servicio.
+
+> Nota: si no se configura ninguna clave RSA (`JWT_RSA_*`), el servicio genera un par de claves **efímero** al iniciar.
+> Eso es útil para desarrollo, pero invalida access tokens existentes tras reinicios.
 
 ### Opción manual sin Docker para la app
 
@@ -73,7 +78,12 @@ $env:DB_URL="jdbc:postgresql://localhost:5432/streambuted_identity"
 $env:DB_USERNAME="streambuted"
 $env:DB_PASSWORD="your_secure_password"
 
-$env:JWT_SECRET="YourVeryLongAndSecureSecretKeyThatIsAtLeast512BitsLong!!"
+$env:JWT_ISSUER="http://localhost:8081"
+$env:JWT_KEY_ID=""
+$env:JWT_RSA_PRIVATE_KEY_PEM=""
+$env:JWT_RSA_PUBLIC_KEY_PEM=""
+$env:JWT_RSA_PRIVATE_KEY_BASE64=""
+$env:JWT_RSA_PUBLIC_KEY_BASE64=""
 
 $env:RABBITMQ_HOST="localhost"
 $env:RABBITMQ_USERNAME="streambuted"
@@ -140,6 +150,7 @@ El servicio estará disponible en:
 | `POST` | `/api/v1/auth/login` | Login, retorna `accessToken` en JSON y `refresh_token` en cookie HttpOnly |
 | `POST` | `/api/v1/auth/refresh` | Lee `refresh_token` desde cookie, rota token y emite nuevo `accessToken` |
 | `POST` | `/api/v1/auth/logout` | Limpia cookie `refresh_token` y elimina el token persistido |
+| `GET` | `/api/v1/auth/.well-known/jwks.json` | Publica JWKS (claves públicas) para validación local de access tokens |
 
 **Ejemplo — Register:**
 ```json

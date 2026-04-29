@@ -19,7 +19,7 @@ spring:
       - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
 
 jwt:
-  secret: TestSecretKeyThatIsLongEnoughForHS512AlgorithmAndMustBeAtLeast512BitsLong!!!!!
+  issuer: http://identity-service-test
   access-token-expiry-ms: 900000
   refresh-token-expiry-ms: 604800000
 

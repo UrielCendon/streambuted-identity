@@ -43,7 +43,12 @@ grpc:
 
 # ── JWT ─────────────────────────────────────────────────────────────────────
 jwt:
-  secret: ${JWT_SECRET}
+  issuer: ${JWT_ISSUER:http://identity-service:8081}
+  key-id: ${JWT_KEY_ID:}
+  rsa-private-key-pem: ${JWT_RSA_PRIVATE_KEY_PEM:}
+  rsa-private-key-base64: ${JWT_RSA_PRIVATE_KEY_BASE64:}
+  rsa-public-key-pem: ${JWT_RSA_PUBLIC_KEY_PEM:}
+  rsa-public-key-base64: ${JWT_RSA_PUBLIC_KEY_BASE64:}
   access-token-expiry-ms: ${JWT_ACCESS_EXPIRY_MS:900000}      # 15 minutes
   refresh-token-expiry-ms: ${JWT_REFRESH_EXPIRY_MS:604800000} # 7 days
 

@@ -2,18 +2,16 @@ package streambuted.identity.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.UnsupportedJwtException;
-import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import streambuted.identity.domain.UserAccountEntity;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
@@ -22,9 +20,10 @@ import java.util.UUID;
 /**
  * Handles JWT issuance, parsing and validation.
  *
- * Algorithm : HMAC-SHA512 (HS512)
+ * Algorithm : RSA + SHA-256 (RS256)
  * Access TTL : 15 min (configurable via jwt.access-token-expiry-ms)
  * Claims     : sub (userId), email, role
+ * Key        : Identity holds the private key; public key is exposed via JWKS.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,14 +34,7 @@ public class JwtService {
     private static final String CLAIM_EMAIL = "email";
 
     private final JwtProperties jwtProperties;
-
-    // ── Key derivation ────────────────────────────────────────────────────────
-
-    /** Derives the signing key from the configured secret string. */
-    private SecretKey signingKey() {
-        byte[] keyBytes = jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
+    private final RsaJwtKeyProvider rsaJwtKeyProvider;
 
     // ── Token issuance ────────────────────────────────────────────────────────
 
@@ -57,13 +49,15 @@ public class JwtService {
         Instant expiry = now.plusMillis(jwtProperties.getAccessTokenExpiryMs());
 
         return Jwts.builder()
+            .header().keyId(rsaJwtKeyProvider.getKeyId()).and()
+            .issuer(jwtProperties.getIssuer())
             .subject(account.getId().toString())
             .id(UUID.randomUUID().toString())
             .claim(CLAIM_EMAIL, account.getEmail())
             .claim(CLAIM_ROLE, account.getRole().name().toLowerCase())
             .issuedAt(Date.from(now))
             .expiration(Date.from(expiry))
-            .signWith(signingKey())
+            .signWith(rsaJwtKeyProvider.getPrivateKey(), SignatureAlgorithm.RS256)
             .compact();
     }
 
@@ -80,7 +74,7 @@ public class JwtService {
 
         try {
             Claims claims = Jwts.parser()
-                .verifyWith(signingKey())
+                .verifyWith(rsaJwtKeyProvider.getPublicKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();

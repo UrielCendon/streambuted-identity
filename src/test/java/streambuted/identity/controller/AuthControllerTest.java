@@ -17,6 +17,7 @@ import streambuted.identity.dto.LoginRequest;
 import streambuted.identity.dto.LoginResponse;
 import streambuted.identity.security.JwtProperties;
 import streambuted.identity.security.JwtService;
+import streambuted.identity.security.RsaJwtKeyProvider;
 import streambuted.identity.service.AuthService;
 
 import static org.hamcrest.Matchers.containsString;
@@ -46,6 +47,9 @@ class AuthControllerTest {
 
     @MockBean
     private JwtService jwtService;
+
+    @MockBean
+    private RsaJwtKeyProvider rsaJwtKeyProvider;
 
     @BeforeEach
     void setUp() {

@@ -9,6 +9,7 @@ import org.mockito.quality.Strictness;
 import streambuted.identity.domain.Role;
 import streambuted.identity.domain.UserAccountEntity;
 import streambuted.identity.security.JwtProperties;
+import streambuted.identity.security.RsaJwtKeyProvider;
 import streambuted.identity.security.JwtService;
 
 import java.util.Optional;
@@ -31,23 +32,23 @@ import static org.mockito.Mockito.*;
 @DisplayName("JwtService Unit Tests")
 class JwtServiceTest {
 
-    private static final String TEST_SECRET =
-        "TestSecretKeyThatIsLongEnoughForHS512AlgorithmAndMustBeAtLeast512BitsLong!!!!!";
     private static final long ACCESS_EXPIRY_MS  = 900_000L;  // 15 min
     private static final long REFRESH_EXPIRY_MS = 604_800_000L; // 7 days
 
     @Mock
     private JwtProperties jwtProperties;
 
-    @InjectMocks
     private JwtService jwtService;
 
     private UserAccountEntity testAccount;
 
     @BeforeEach
     void setUp() {
-        when(jwtProperties.getSecret()).thenReturn(TEST_SECRET);
+        when(jwtProperties.getIssuer()).thenReturn("http://identity-service-test");
         when(jwtProperties.getAccessTokenExpiryMs()).thenReturn(ACCESS_EXPIRY_MS);
+
+        RsaJwtKeyProvider rsaJwtKeyProvider = new RsaJwtKeyProvider(jwtProperties);
+        jwtService = new JwtService(jwtProperties, rsaJwtKeyProvider);
 
         testAccount = UserAccountEntity.builder()
             .id(UUID.randomUUID())
@@ -146,16 +147,16 @@ class JwtServiceTest {
         }
 
         @Test
-        @DisplayName("should return false for a token signed with a different secret")
-        void isTokenValid_differentSecret_returnsFalse() {
+        @DisplayName("should return false for a token signed with a different key")
+        void isTokenValid_differentKey_returnsFalse() {
             String token = jwtService.generateAccessToken(testAccount);
 
             JwtProperties otherProps = mock(JwtProperties.class);
-            when(otherProps.getSecret()).thenReturn(
-                "ACompletelyDifferentSecretKeyThatIsAlsoLongEnoughForHS512Algorithm!!"
-            );
+            when(otherProps.getIssuer()).thenReturn("http://identity-service-test");
             when(otherProps.getAccessTokenExpiryMs()).thenReturn(ACCESS_EXPIRY_MS);
-            JwtService otherService = new JwtService(otherProps);
+
+            RsaJwtKeyProvider otherKeyProvider = new RsaJwtKeyProvider(otherProps);
+            JwtService otherService = new JwtService(otherProps, otherKeyProvider);
 
             assertThat(otherService.isTokenValid(token)).isFalse();
         }

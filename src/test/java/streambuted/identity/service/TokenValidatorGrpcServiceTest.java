@@ -14,6 +14,7 @@ import streambuted.identity.grpc.TokenResponse;
 import streambuted.identity.grpc.TokenValidatorGrpcService;
 import streambuted.identity.repository.UserAccountRepository;
 import streambuted.identity.security.JwtProperties;
+import streambuted.identity.security.RsaJwtKeyProvider;
 import streambuted.identity.security.JwtService;
 
 import java.util.Optional;
@@ -38,8 +39,6 @@ import static org.mockito.Mockito.*;
 @DisplayName("TokenValidatorGrpcService Unit Tests")
 class TokenValidatorGrpcServiceTest {
 
-    private static final String TEST_SECRET =
-        "TestSecretKeyThatIsLongEnoughForHS512AlgorithmAndMustBeAtLeast512BitsLong!!!!!";
     private static final long ACCESS_EXPIRY_MS = 900_000L;
 
     @Mock private UserAccountRepository accountRepository;
@@ -62,10 +61,10 @@ class TokenValidatorGrpcServiceTest {
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        when(jwtProperties.getSecret()).thenReturn(TEST_SECRET);
+        when(jwtProperties.getIssuer()).thenReturn("http://identity-service-test");
         when(jwtProperties.getAccessTokenExpiryMs()).thenReturn(ACCESS_EXPIRY_MS);
 
-        jwtService = new JwtService(jwtProperties);
+        jwtService = new JwtService(jwtProperties, new RsaJwtKeyProvider(jwtProperties));
 
         grpcService = new TokenValidatorGrpcService(jwtService, accountRepository);
 
@@ -188,9 +187,9 @@ class TokenValidatorGrpcServiceTest {
         @DisplayName("should return is_valid=false for an expired token")
         void validate_expiredToken_returnsInvalid() {
             JwtProperties expiredProps = mock(JwtProperties.class);
-            when(expiredProps.getSecret()).thenReturn(TEST_SECRET);
+            when(expiredProps.getIssuer()).thenReturn("http://identity-service-test");
             when(expiredProps.getAccessTokenExpiryMs()).thenReturn(-1L); // instantly expired
-            JwtService expiredJwtService = new JwtService(expiredProps);
+            JwtService expiredJwtService = new JwtService(expiredProps, new RsaJwtKeyProvider(expiredProps));
 
             String expiredToken = expiredJwtService.generateAccessToken(activeAccount);
             TokenRequest request = TokenRequest.newBuilder().setToken(expiredToken).build();

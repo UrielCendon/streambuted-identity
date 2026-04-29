@@ -16,8 +16,19 @@ import org.springframework.stereotype.Component;
 @Setter
 public class JwtProperties {
 
-    /** HMAC-SHA512 signing secret — must be at least 512 bits (64 chars). */
-    private String secret;
+    /** Token issuer (iss claim). Should be stable across environments. */
+    private String issuer;
+
+    /** Optional RSA private key (PKCS#8) provided as PEM or base64-encoded DER. */
+    private String rsaPrivateKeyPem;
+    private String rsaPrivateKeyBase64;
+
+    /** Optional RSA public key (X.509) provided as PEM or base64-encoded DER. */
+    private String rsaPublicKeyPem;
+    private String rsaPublicKeyBase64;
+
+    /** Optional key id to use in JWT header and JWKS (kid). If blank, derived from public key. */
+    private String keyId;
 
     /** Access token lifetime in milliseconds (default 15 min = 900_000 ms). */
     private long accessTokenExpiryMs;
