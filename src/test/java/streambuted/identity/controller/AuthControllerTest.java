@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import streambuted.identity.dto.LoginRequest;
 import streambuted.identity.dto.LoginResponse;
 import streambuted.identity.security.JwtProperties;
+import streambuted.identity.security.JwtService;
 import streambuted.identity.service.AuthService;
 
 import static org.hamcrest.Matchers.containsString;
@@ -42,6 +43,9 @@ class AuthControllerTest {
 
     @MockBean
     private JwtProperties jwtProperties;
+
+    @MockBean
+    private JwtService jwtService;
 
     @BeforeEach
     void setUp() {

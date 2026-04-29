@@ -5,7 +5,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.core.MessageBuilder;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.InitializingBean;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 /**
@@ -39,7 +41,7 @@ public class IdentityEventPublisher implements InitializingBean {
     @Value("${EVENT_SIGNING_SECRET:}")
     private String eventSigningSecret;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -67,12 +69,14 @@ public class IdentityEventPublisher implements InitializingBean {
             // Always sign: afterPropertiesSet() guarantees eventSigningSecret is non-null and non-blank
             String signature = computeHmacBase64(payloadJson, eventSigningSecret);
 
-            MessagePostProcessor mpp = (Message message) -> {
-                message.getMessageProperties().setHeader("X-Event-Signature", signature);
-                return message;
-            };
+            Message message = MessageBuilder
+                .withBody(payloadJson.getBytes(StandardCharsets.UTF_8))
+                .setContentType(MessageProperties.CONTENT_TYPE_JSON)
+                .setContentEncoding(StandardCharsets.UTF_8.name())
+                .setHeader("X-Event-Signature", signature)
+                .build();
 
-            rabbitTemplate.convertAndSend(identityExchange, userPromotedRoutingKey, payloadJson, mpp);
+            rabbitTemplate.send(identityExchange, userPromotedRoutingKey, message);
 
             log.info("Published UserPromotedEvent for userId={}, eventId={}",
                 event.userId(), event.eventId());
@@ -90,8 +94,8 @@ public class IdentityEventPublisher implements InitializingBean {
 
     private String computeHmacBase64(String payload, String secret) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
-        byte[] sig = mac.doFinal(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        byte[] sig = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
         return Base64.getEncoder().encodeToString(sig);
     }
 }
