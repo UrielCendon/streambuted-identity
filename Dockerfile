@@ -2,10 +2,11 @@
 
 # Stage 1: Build
 FROM maven:3.9.9-eclipse-temurin-21 AS builder
-WORKDIR /build
+WORKDIR /build/services/identity-service
 
-COPY pom.xml ./
-COPY src ./src
+COPY services/identity-service/pom.xml ./pom.xml
+COPY services/identity-service/src ./src
+COPY contracts /build/contracts
 
 RUN mvn -B -DskipTests clean package
 
@@ -16,7 +17,7 @@ RUN groupadd --system appgroup \
     && useradd --system --gid appgroup --create-home appuser
 
 WORKDIR /app
-COPY --from=builder /build/target/identity-service-*.jar /app/app.jar
+COPY --from=builder /build/services/identity-service/target/identity-service-*.jar /app/app.jar
 
 EXPOSE 8081 9091
 

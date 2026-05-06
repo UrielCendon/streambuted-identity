@@ -65,6 +65,8 @@ identity-service y catalog-service con una sola orquestación.
 - `RABBITMQ_VHOST`: virtual host de RabbitMQ.
 - `SERVER_PORT`: puerto HTTP del servicio.
 - `GRPC_PORT`: puerto gRPC del servicio.
+- `MEDIA_GRPC_TARGET`: destino interno de Media Service para validar assets (`media-service:9093` en Docker).
+- `MEDIA_GRPC_TIMEOUT_MS`: timeout de validacion gRPC contra Media.
 
 > Nota: si no se configura ninguna clave RSA (`JWT_RSA_*`), el servicio genera un par de claves **efímero** al iniciar.
 > Eso es útil para desarrollo, pero invalida access tokens existentes tras reinicios.
@@ -90,6 +92,8 @@ $env:RABBITMQ_USERNAME="streambuted"
 $env:RABBITMQ_PASSWORD="change_me_rabbit_password"
 
 $env:GRPC_PORT="9091"
+$env:MEDIA_GRPC_TARGET="localhost:9093"
+$env:MEDIA_GRPC_TIMEOUT_MS="2000"
 ```
 
 
@@ -208,12 +212,28 @@ await axios.post(
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET`   | `/api/v1/users/me` | Perfil completo del usuario autenticado |
+| `PUT`   | `/api/v1/users/me` | Actualiza perfil y valida `profileImageAssetId` contra Media por gRPC |
 | `PATCH` | `/api/v1/users/promote` | Promueve LISTENER → ARTIST (irreversible) |
 
 **Header requerido:**
 ```
 Authorization: Bearer <accessToken>
 ```
+
+**Actualizar foto de perfil:**
+1. Sube la imagen en Media con `POST /api/v1/media/profile-image`.
+2. Usa el `assetId` devuelto en `PUT /api/v1/users/me`.
+
+```json
+PUT /api/v1/users/me
+{
+  "profileImageAssetId": "uuid-del-asset"
+}
+```
+
+Identity guarda solo la referencia si Media confirma por gRPC que el asset existe,
+es `PROFILE_IMAGE` y pertenece al usuario autenticado. Enviar
+`"profileImageAssetId": null` limpia la referencia sin borrar el archivo de MinIO.
 
 ### Formato de error (todos los endpoints)
 

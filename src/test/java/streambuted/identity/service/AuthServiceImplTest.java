@@ -108,7 +108,9 @@ class AuthServiceImplTest {
             verify(accountRepository).save(argThat(acc ->
                 acc.getEmail().equals(VALID_EMAIL) &&
                 acc.getRole() == Role.LISTENER &&
-                acc.isActive()
+                acc.isActive() &&
+                acc.getProfile() != null &&
+                acc.getProfile().getProfileImageAssetId() == null
             ));
             verify(refreshTokenRepository).save(any(RefreshTokenEntity.class));
         }

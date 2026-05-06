@@ -2,10 +2,12 @@ package streambuted.identity.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import streambuted.identity.dto.UpdateUserProfileRequest;
 import streambuted.identity.dto.UserProfileResponse;
 import streambuted.identity.service.UserService;
 
@@ -35,6 +37,20 @@ public class UserController {
     ) {
         log.debug("Profile requested for userId={}", userId);
         return ResponseEntity.ok(userService.getProfile(userId));
+    }
+
+    /**
+     * PUT /api/v1/users/me
+     * Updates editable profile fields for the currently authenticated user.
+     */
+    @PutMapping("/me")
+    public ResponseEntity<UserProfileResponse> updateMyProfile(
+        @AuthenticationPrincipal UUID userId,
+        @RequestBody UpdateUserProfileRequest request,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader
+    ) {
+        log.debug("Profile update requested for userId={}", userId);
+        return ResponseEntity.ok(userService.updateProfile(userId, request, authorizationHeader));
     }
 
     /**

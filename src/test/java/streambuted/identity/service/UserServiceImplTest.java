@@ -6,9 +6,14 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.springframework.http.HttpStatus;
 import streambuted.identity.domain.*;
+import streambuted.identity.dto.UpdateUserProfileRequest;
 import streambuted.identity.dto.UserProfileResponse;
 import streambuted.identity.exception.*;
+import streambuted.identity.media.MediaAssetClient;
+import streambuted.identity.media.MediaAssetMetadata;
 import streambuted.identity.repository.*;
 
 import java.util.Optional;
@@ -33,6 +38,7 @@ class UserServiceImplTest {
     @Mock private UserAccountRepository  accountRepository;
     @Mock private UserProfileRepository  profileRepository;
     @Mock private OutboxRepository       outboxRepository;
+    @Mock private MediaAssetClient       mediaAssetClient;
     @Spy private ObjectMapper            objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @InjectMocks
@@ -42,6 +48,8 @@ class UserServiceImplTest {
     private UserAccountEntity listenerAccount;
     private UserAccountEntity artistAccount;
     private UserProfileEntity profile;
+
+    private static final String AUTHORIZATION_HEADER = "Bearer access-token";
 
     @BeforeEach
     void setUp() {
@@ -100,6 +108,160 @@ class UserServiceImplTest {
             assertThatThrownBy(() -> userService.getProfile(unknownId))
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessageContaining(unknownId.toString());
+        }
+    }
+
+    @Nested
+    @DisplayName("updateProfile()")
+    class UpdateProfileTests {
+
+        @Test
+        @DisplayName("should leave profileImageAssetId unchanged when field is omitted")
+        void updateProfile_withoutProfileImage_doesNotChangeExistingImage() {
+            UUID existingAssetId = UUID.randomUUID();
+            profile.setProfileImageAssetId(existingAssetId.toString());
+            UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+            request.setBio("Updated bio");
+
+            stubAccountAndProfile();
+
+            UserProfileResponse response = userService.updateProfile(
+                accountId,
+                request,
+                AUTHORIZATION_HEADER
+            );
+
+            assertThat(response.bio()).isEqualTo("Updated bio");
+            assertThat(response.profileImageAssetId()).isEqualTo(existingAssetId.toString());
+            verify(mediaAssetClient, never()).getAssetMetadata(any(), any());
+            verify(profileRepository).save(profile);
+        }
+
+        @Test
+        @DisplayName("should validate PROFILE_IMAGE asset before saving reference")
+        void updateProfile_validProfileImage_savesReference() {
+            UUID assetId = UUID.randomUUID();
+            UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+            request.setProfileImageAssetId(assetId.toString());
+
+            stubAccountAndProfile();
+            when(mediaAssetClient.getAssetMetadata(assetId, AUTHORIZATION_HEADER))
+                .thenReturn(profileImageMetadata(assetId, accountId));
+
+            UserProfileResponse response = userService.updateProfile(
+                accountId,
+                request,
+                AUTHORIZATION_HEADER
+            );
+
+            assertThat(response.profileImageAssetId()).isEqualTo(assetId.toString());
+            verify(profileRepository).save(argThat(saved ->
+                assetId.toString().equals(saved.getProfileImageAssetId())
+            ));
+        }
+
+        @Test
+        @DisplayName("should reject malformed profileImageAssetId")
+        void updateProfile_invalidUuid_rejectsRequest() {
+            UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+            request.setProfileImageAssetId("not-a-uuid");
+
+            stubAccountAndProfile();
+
+            assertProfileUpdateFailure(
+                () -> userService.updateProfile(accountId, request, AUTHORIZATION_HEADER),
+                HttpStatus.BAD_REQUEST
+            );
+
+            verify(mediaAssetClient, never()).getAssetMetadata(any(), any());
+            verify(profileRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject non PROFILE_IMAGE assets")
+        void updateProfile_audioAsset_rejectsRequest() {
+            UUID assetId = UUID.randomUUID();
+            UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+            request.setProfileImageAssetId(assetId.toString());
+
+            stubAccountAndProfile();
+            when(mediaAssetClient.getAssetMetadata(assetId, AUTHORIZATION_HEADER))
+                .thenReturn(new MediaAssetMetadata(
+                    assetId,
+                    "AUDIO",
+                    accountId,
+                    "audio/mpeg",
+                    2048L,
+                    true
+                ));
+
+            assertProfileUpdateFailure(
+                () -> userService.updateProfile(accountId, request, AUTHORIZATION_HEADER),
+                HttpStatus.BAD_REQUEST
+            );
+
+            verify(profileRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject assets owned by another user")
+        void updateProfile_otherOwner_rejectsRequest() {
+            UUID assetId = UUID.randomUUID();
+            UUID otherUserId = UUID.randomUUID();
+            UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+            request.setProfileImageAssetId(assetId.toString());
+
+            stubAccountAndProfile();
+            when(mediaAssetClient.getAssetMetadata(assetId, AUTHORIZATION_HEADER))
+                .thenReturn(profileImageMetadata(assetId, otherUserId));
+
+            assertProfileUpdateFailure(
+                () -> userService.updateProfile(accountId, request, AUTHORIZATION_HEADER),
+                HttpStatus.FORBIDDEN
+            );
+
+            verify(profileRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should clear profileImageAssetId when field is explicit null")
+        void updateProfile_nullProfileImage_clearsReference() {
+            profile.setProfileImageAssetId(UUID.randomUUID().toString());
+            UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+            request.setProfileImageAssetId(null);
+
+            stubAccountAndProfile();
+
+            UserProfileResponse response = userService.updateProfile(
+                accountId,
+                request,
+                AUTHORIZATION_HEADER
+            );
+
+            assertThat(response.profileImageAssetId()).isNull();
+            verify(mediaAssetClient, never()).getAssetMetadata(any(), any());
+            verify(profileRepository).save(profile);
+        }
+
+        @Test
+        @DisplayName("should surface controlled error when Media is unavailable")
+        void updateProfile_mediaUnavailable_rejectsRequest() {
+            UUID assetId = UUID.randomUUID();
+            UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+            request.setProfileImageAssetId(assetId.toString());
+
+            stubAccountAndProfile();
+            when(mediaAssetClient.getAssetMetadata(assetId, AUTHORIZATION_HEADER))
+                .thenThrow(ProfileUpdateException.serviceUnavailable(
+                    "Media Service is temporarily unavailable for asset validation."
+                ));
+
+            assertProfileUpdateFailure(
+                () -> userService.updateProfile(accountId, request, AUTHORIZATION_HEADER),
+                HttpStatus.SERVICE_UNAVAILABLE
+            );
+
+            verify(profileRepository, never()).save(any());
         }
     }
 
@@ -210,5 +372,31 @@ class UserServiceImplTest {
                 && payload.get("newRole").asText().equals("artist")
                 && payload.get("email").asText().equals("listener@example.com");
         }
+    }
+
+    private void stubAccountAndProfile() {
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(listenerAccount));
+        when(profileRepository.findByAccountId(accountId)).thenReturn(Optional.of(profile));
+    }
+
+    private MediaAssetMetadata profileImageMetadata(UUID assetId, UUID ownerUserId) {
+        return new MediaAssetMetadata(
+            assetId,
+            "PROFILE_IMAGE",
+            ownerUserId,
+            "image/png",
+            1024L,
+            true
+        );
+    }
+
+    private void assertProfileUpdateFailure(
+        ThrowingCallable callable,
+        HttpStatus expectedStatus
+    ) {
+        assertThatThrownBy(callable)
+            .isInstanceOf(ProfileUpdateException.class)
+            .satisfies(error -> assertThat(((ProfileUpdateException) error).getHttpStatus())
+                .isEqualTo(expectedStatus));
     }
 }

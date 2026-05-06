@@ -11,9 +11,13 @@ import streambuted.identity.domain.OutboxStatus;
 import streambuted.identity.domain.Role;
 import streambuted.identity.domain.UserAccountEntity;
 import streambuted.identity.domain.UserProfileEntity;
+import streambuted.identity.dto.UpdateUserProfileRequest;
 import streambuted.identity.dto.UserProfileResponse;
+import streambuted.identity.exception.ProfileUpdateException;
 import streambuted.identity.exception.RolePromotionException;
 import streambuted.identity.exception.UserNotFoundException;
+import streambuted.identity.media.MediaAssetClient;
+import streambuted.identity.media.MediaAssetMetadata;
 import streambuted.identity.messaging.UserPromotedEvent;
 import streambuted.identity.repository.OutboxRepository;
 import streambuted.identity.repository.UserAccountRepository;
@@ -22,10 +26,7 @@ import streambuted.identity.repository.UserProfileRepository;
 import java.util.UUID;
 
 /**
- * Handles profile reads and the listener-to-artist promotion flow.
- *
- * Promotion is persisted atomically together with an outbox row.
- * A scheduled relay later publishes the event to RabbitMQ.
+ * Handles profile reads, profile updates, and listener-to-artist promotion.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,12 +34,16 @@ import java.util.UUID;
 @Transactional
 public class UserServiceImpl implements UserService {
 
-    private final UserAccountRepository   accountRepository;
-    private final UserProfileRepository   profileRepository;
-    private final OutboxRepository        outboxRepository;
-    private final ObjectMapper            objectMapper;
+    private static final String PROFILE_IMAGE_ASSET_TYPE = "PROFILE_IMAGE";
+    private static final int USERNAME_MIN_LENGTH = 3;
+    private static final int USERNAME_MAX_LENGTH = 50;
+    private static final int BIO_MAX_LENGTH = 1000;
 
-    // ── Profile retrieval ─────────────────────────────────────────────────────
+    private final UserAccountRepository accountRepository;
+    private final UserProfileRepository profileRepository;
+    private final OutboxRepository outboxRepository;
+    private final ObjectMapper objectMapper;
+    private final MediaAssetClient mediaAssetClient;
 
     @Override
     @Transactional(readOnly = true)
@@ -52,14 +57,31 @@ public class UserServiceImpl implements UserService {
         return mapToResponse(account, profile);
     }
 
-    // ── Promotion ─────────────────────────────────────────────────────────────
+    @Override
+    public UserProfileResponse updateProfile(
+        UUID userId,
+        UpdateUserProfileRequest request,
+        String authorizationHeader
+    ) {
+        UserAccountEntity account = accountRepository.findById(userId)
+            .orElseThrow(() -> new UserNotFoundException(userId.toString()));
+
+        UserProfileEntity profile = profileRepository.findByAccountId(userId)
+            .orElseThrow(() -> new UserNotFoundException(userId.toString()));
+
+        applyUsernameUpdate(profile, request);
+        applyBioUpdate(profile, request);
+        applyProfileImageUpdate(profile, userId, request, authorizationHeader);
+
+        profileRepository.save(profile);
+        return mapToResponse(account, profile);
+    }
 
     @Override
     public UserProfileResponse promoteToArtist(UUID userId) {
         UserAccountEntity account = accountRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException(userId.toString()));
 
-        // Only listeners can be promoted — admins and existing artists are rejected
         if (account.getRole() != Role.LISTENER) {
             throw new RolePromotionException(
                 "Role promotion is only available to accounts with the LISTENER role. "
@@ -94,7 +116,102 @@ public class UserServiceImpl implements UserService {
         return mapToResponse(account, profile);
     }
 
-    // ── Mapping ───────────────────────────────────────────────────────────────
+    private void applyUsernameUpdate(
+        UserProfileEntity profile,
+        UpdateUserProfileRequest request
+    ) {
+        if (!request.hasUsername()) {
+            return;
+        }
+
+        String username = request.username();
+        if (username == null || username.isBlank()) {
+            throw ProfileUpdateException.badRequest("Username must not be blank.");
+        }
+
+        String normalizedUsername = username.trim();
+        if (
+            normalizedUsername.length() < USERNAME_MIN_LENGTH
+                || normalizedUsername.length() > USERNAME_MAX_LENGTH
+        ) {
+            throw ProfileUpdateException.badRequest(
+                "Username must be between 3 and 50 characters."
+            );
+        }
+
+        profile.setUsername(normalizedUsername);
+    }
+
+    private void applyBioUpdate(
+        UserProfileEntity profile,
+        UpdateUserProfileRequest request
+    ) {
+        if (!request.hasBio()) {
+            return;
+        }
+
+        String bio = request.bio();
+        if (bio == null) {
+            profile.setBio(null);
+            return;
+        }
+
+        String normalizedBio = bio.trim();
+        if (normalizedBio.length() > BIO_MAX_LENGTH) {
+            throw ProfileUpdateException.badRequest(
+                "Bio must not exceed 1000 characters."
+            );
+        }
+
+        profile.setBio(normalizedBio.isEmpty() ? null : normalizedBio);
+    }
+
+    private void applyProfileImageUpdate(
+        UserProfileEntity profile,
+        UUID userId,
+        UpdateUserProfileRequest request,
+        String authorizationHeader
+    ) {
+        if (!request.hasProfileImageAssetId()) {
+            return;
+        }
+
+        String profileImageAssetId = request.profileImageAssetId();
+        if (profileImageAssetId == null) {
+            profile.setProfileImageAssetId(null);
+            return;
+        }
+
+        UUID assetId = parseProfileImageAssetId(profileImageAssetId);
+        MediaAssetMetadata metadata = mediaAssetClient.getAssetMetadata(
+            assetId,
+            authorizationHeader
+        );
+
+        if (!metadata.exists() || !PROFILE_IMAGE_ASSET_TYPE.equals(metadata.assetType())) {
+            throw ProfileUpdateException.badRequest(
+                "profileImageAssetId must reference an existing PROFILE_IMAGE asset."
+            );
+        }
+
+        if (!userId.equals(metadata.ownerUserId())) {
+            throw ProfileUpdateException.forbidden(
+                "The referenced media asset does not belong to the authenticated user."
+            );
+        }
+
+        profile.setProfileImageAssetId(metadata.assetId().toString());
+    }
+
+    private UUID parseProfileImageAssetId(String profileImageAssetId) {
+        try {
+            return UUID.fromString(profileImageAssetId.trim());
+        } catch (RuntimeException ex) {
+            throw ProfileUpdateException.badRequest(
+                "profileImageAssetId must be a valid UUID."
+            );
+        }
+    }
 
     private UserProfileResponse mapToResponse(UserAccountEntity account, UserProfileEntity profile) {
         return new UserProfileResponse(

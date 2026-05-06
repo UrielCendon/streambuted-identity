@@ -61,6 +61,11 @@ messaging:
   queue:
     user-promoted: identity.user.promoted
 
+media:
+  grpc:
+    target: ${MEDIA_GRPC_TARGET:media-service:9093}
+    timeout-ms: ${MEDIA_GRPC_TIMEOUT_MS:2000}
+
 # ── Actuator ────────────────────────────────────────────────────────────────
 management:
   endpoints:
