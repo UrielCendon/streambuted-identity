@@ -58,10 +58,10 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
             .build();
 
         try {
-            AssetMetadataResponse response = MetadataUtils.attachHeaders(
-                blockingStub.withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS),
-                metadata
-            ).getAssetMetadata(request);
+            AssetMetadataResponse response = blockingStub
+                .withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)
+                .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(metadata))
+                .getAssetMetadata(request);
             return normalizeResponse(response, assetId);
         } catch (StatusRuntimeException ex) {
             throw mapGrpcError(ex, assetId);
