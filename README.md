@@ -67,6 +67,12 @@ identity-service y catalog-service con una sola orquestación.
 - `GRPC_PORT`: puerto gRPC del servicio.
 - `MEDIA_GRPC_TARGET`: destino interno de Media Service para validar assets (`media-service:9093` en Docker).
 - `MEDIA_GRPC_TIMEOUT_MS`: timeout de validacion gRPC contra Media.
+- `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_FROM`, `EMAIL_SECURE`:
+  SMTP para codigos de verificacion desde una cuenta tipo no-reply.
+- `EMAIL_SMTP_AUTH`, `EMAIL_STARTTLS_ENABLE`, `EMAIL_VERIFICATION_SUBJECT`: opciones SMTP y asunto del correo.
+- `REGISTRATION_VERIFICATION_CODE_TTL`: duracion del codigo de registro (`15m` por defecto).
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `FRONTEND_URL`:
+  configuracion OAuth 2.0 de Google y retorno al frontend.
 
 > Nota: si no se configura ninguna clave RSA (`JWT_RSA_*`), el servicio genera un par de claves **efímero** al iniciar.
 > Eso es útil para desarrollo, pero invalida access tokens existentes tras reinicios.
@@ -150,10 +156,15 @@ El servicio estará disponible en:
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `POST` | `/api/v1/auth/register` | Registro de nuevo usuario (rol: LISTENER) |
+| `POST` | `/api/v1/auth/register` | Inicia registro y envia codigo de verificacion por correo |
+| `POST` | `/api/v1/auth/register/verify` | Valida codigo y completa el registro (rol: LISTENER) |
+| `POST` | `/api/v1/auth/register/resend` | Invalida el codigo anterior y envia uno nuevo |
+| `POST` | `/api/v1/auth/register/cancel` | Cancela la verificacion pendiente |
 | `POST` | `/api/v1/auth/login` | Login, retorna `accessToken` en JSON y `refresh_token` en cookie HttpOnly |
 | `POST` | `/api/v1/auth/refresh` | Lee `refresh_token` desde cookie, rota token y emite nuevo `accessToken` |
 | `POST` | `/api/v1/auth/logout` | Limpia cookie `refresh_token` y elimina el token persistido |
+| `GET` | `/api/v1/auth/google` | Inicia OAuth 2.0 con Google (`email`, `profile`) |
+| `GET` | `/api/v1/auth/google/callback` | Callback de Google; crea o vincula usuario por email y emite cookie refresh |
 | `GET` | `/api/v1/auth/.well-known/jwks.json` | Publica JWKS (claves públicas) para validación local de access tokens |
 
 **Ejemplo — Register:**
@@ -166,13 +177,24 @@ POST /api/v1/auth/register
 }
 ```
 
-**Respuesta exitosa (201):**
+**Respuesta exitosa (202):**
 ```json
 {
-  "accessToken": "eyJ...",
-  "refreshToken": "uuid-opaque-token",
-  "role": "listener",
-  "expiresIn": 900
+  "attemptId": "uuid-del-intento",
+  "email": "user@example.com",
+  "status": "pending",
+  "expiresInSeconds": 900,
+  "message": "Verification code sent."
+}
+```
+
+**Completar registro:**
+```json
+POST /api/v1/auth/register/verify
+{
+  "attemptId": "uuid-del-intento",
+  "email": "user@example.com",
+  "code": "123456"
 }
 ```
 

@@ -15,5 +15,6 @@ public record UserProfileResponse(
     String profileImageAssetId,
     String role,
     boolean isActive,
+    boolean passwordSetupRequired,
     Instant createdAt
 ) {}

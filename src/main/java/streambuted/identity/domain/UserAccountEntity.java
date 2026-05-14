@@ -40,6 +40,9 @@ public class UserAccountEntity {
     @Column(name = "password_hash", nullable = false, length = 60)
     private String passwordHash;
 
+    @Column(name = "google_subject", unique = true, length = 255)
+    private String googleSubject;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
@@ -48,6 +51,10 @@ public class UserAccountEntity {
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean isActive = true;
+
+    @Column(name = "password_setup_required", nullable = false)
+    @Builder.Default
+    private boolean passwordSetupRequired = false;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

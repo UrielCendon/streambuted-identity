@@ -11,8 +11,11 @@ import streambuted.identity.exception.*;
 import streambuted.identity.repository.*;
 import streambuted.identity.security.JwtProperties;
 import streambuted.identity.security.JwtService;
+import streambuted.identity.service.oauth.GoogleOAuthMode;
+import streambuted.identity.service.oauth.GoogleUserInfo;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,10 +39,12 @@ import static org.mockito.Mockito.*;
 class AuthServiceImplTest {
 
     @Mock private UserAccountRepository  accountRepository;
+    @Mock private UserProfileRepository  profileRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private PasswordEncoder        passwordEncoder;
     @Mock private JwtService             jwtService;
     @Mock private JwtProperties          jwtProperties;
+    @Mock private RegistrationVerificationService registrationVerificationService;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -66,6 +71,8 @@ class AuthServiceImplTest {
             .passwordHash(HASHED_PASSWORD)
             .role(Role.LISTENER)
             .isActive(true)
+            .passwordSetupRequired(false)
+            .createdAt(Instant.parse("2026-05-10T00:00:00Z"))
             .build();
 
         profile = UserProfileEntity.builder()
@@ -78,73 +85,117 @@ class AuthServiceImplTest {
     }
 
     @Nested
-    @DisplayName("register()")
-    class RegisterTests {
+    @DisplayName("email registration verification")
+    class RegistrationVerificationTests {
 
         @Test
-        @DisplayName("should create LISTENER account and return token pair on success")
-        void register_success() {
+        @DisplayName("should start registration by hashing password and sending code without creating account")
+        void startRegistration_success() {
             RegisterRequest request = new RegisterRequest(VALID_EMAIL, VALID_USERNAME, VALID_PASSWORD);
+            RegistrationVerificationResponse expected = new RegistrationVerificationResponse(
+                UUID.randomUUID(),
+                VALID_EMAIL,
+                "pending",
+                900L,
+                "Verification code sent."
+            );
 
-            when(accountRepository.existsByEmail(VALID_EMAIL)).thenReturn(false);
+            when(accountRepository.findByEmail(VALID_EMAIL)).thenReturn(Optional.empty());
+            when(profileRepository.existsByUsername(VALID_USERNAME)).thenReturn(false);
             when(passwordEncoder.encode(VALID_PASSWORD)).thenReturn(HASHED_PASSWORD);
-            when(accountRepository.save(any(UserAccountEntity.class))).thenReturn(activeAccount);
-            when(jwtService.generateAccessToken(any())).thenReturn(ACCESS_TOKEN);
-            when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
-            when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-            when(jwtService.getAccessTokenExpirySeconds()).thenReturn(EXPIRY_SECONDS);
+            when(registrationVerificationService.startRegistration(any(), eq(HASHED_PASSWORD)))
+                .thenReturn(expected);
 
-            // act
-            LoginResponse response = authService.register(request);
+            RegistrationVerificationResponse response = authService.startRegistration(request);
 
-            // assert
-            assertThat(response.accessToken()).isEqualTo(ACCESS_TOKEN);
-            assertThat(response.refreshToken()).isNotBlank();
-            assertThat(response.role()).isEqualTo("listener");
-            assertThat(response.expiresIn()).isEqualTo(EXPIRY_SECONDS);
-
-            verify(accountRepository).existsByEmail(VALID_EMAIL);
-            verify(passwordEncoder).encode(VALID_PASSWORD);
-            verify(accountRepository).save(argThat(acc ->
-                acc.getEmail().equals(VALID_EMAIL) &&
-                acc.getRole() == Role.LISTENER &&
-                acc.isActive() &&
-                acc.getProfile() != null &&
-                acc.getProfile().getProfileImageAssetId() == null
-            ));
-            verify(refreshTokenRepository).save(any(RefreshTokenEntity.class));
+            assertThat(response).isEqualTo(expected);
+            verify(registrationVerificationService).startRegistration(
+                eq(new RegisterRequest(VALID_EMAIL, VALID_USERNAME, VALID_PASSWORD)),
+                eq(HASHED_PASSWORD)
+            );
+            verify(accountRepository, never()).save(any());
+            verify(refreshTokenRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("should throw EmailAlreadyExistsException when email is taken")
-        void register_duplicateEmail_throwsException() {
+        @DisplayName("should throw EmailAlreadyExistsException when email is taken before code is sent")
+        void startRegistration_duplicateEmail_throwsException() {
             RegisterRequest request = new RegisterRequest(VALID_EMAIL, VALID_USERNAME, VALID_PASSWORD);
-            when(accountRepository.existsByEmail(VALID_EMAIL)).thenReturn(true);
+            when(accountRepository.findByEmail(VALID_EMAIL)).thenReturn(Optional.of(activeAccount));
 
-            assertThatThrownBy(() -> authService.register(request))
+            assertThatThrownBy(() -> authService.startRegistration(request))
                 .isInstanceOf(EmailAlreadyExistsException.class)
                 .hasMessageContaining(VALID_EMAIL);
 
-            verify(accountRepository, never()).save(any());
+            verify(registrationVerificationService, never()).startRegistration(any(), any());
             verify(passwordEncoder, never()).encode(any());
         }
 
         @Test
-        @DisplayName("should always assign LISTENER role regardless of other inputs")
-        void register_alwaysAssignsListenerRole() {
-            RegisterRequest request = new RegisterRequest(VALID_EMAIL, VALID_USERNAME, VALID_PASSWORD);
-            when(accountRepository.existsByEmail(VALID_EMAIL)).thenReturn(false);
-            when(passwordEncoder.encode(any())).thenReturn(HASHED_PASSWORD);
-            when(accountRepository.save(any())).thenReturn(activeAccount);
+        @DisplayName("should complete registration only after verification service accepts the code")
+        void verifyRegistration_success() {
+            UUID attemptId = UUID.randomUUID();
+            RegistrationVerificationEntity attempt = RegistrationVerificationEntity.builder()
+                .id(attemptId)
+                .email(VALID_EMAIL)
+                .username(VALID_USERNAME)
+                .passwordHash(HASHED_PASSWORD)
+                .status(RegistrationVerificationStatus.VERIFIED)
+                .expiresAt(Instant.now().plusSeconds(900))
+                .build();
+
+            when(registrationVerificationService.verifyCode(any())).thenReturn(attempt);
+            when(accountRepository.findByEmail(VALID_EMAIL)).thenReturn(Optional.empty());
+            when(profileRepository.existsByUsername(VALID_USERNAME)).thenReturn(false);
+            when(accountRepository.save(any(UserAccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
             when(jwtService.generateAccessToken(any())).thenReturn(ACCESS_TOKEN);
             when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
             when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jwtService.getAccessTokenExpirySeconds()).thenReturn(EXPIRY_SECONDS);
 
-            LoginResponse response = authService.register(request);
+            LoginResponse response = authService.verifyRegistration(
+                new VerifyRegistrationRequest(attemptId, VALID_EMAIL, "123456")
+            );
 
+            assertThat(response.accessToken()).isEqualTo(ACCESS_TOKEN);
             assertThat(response.role()).isEqualTo("listener");
-            verify(accountRepository).save(argThat(acc -> acc.getRole() == Role.LISTENER));
+            verify(accountRepository).save(argThat(acc ->
+                acc.getEmail().equals(VALID_EMAIL) &&
+                acc.getPasswordHash().equals(HASHED_PASSWORD) &&
+                acc.getRole() == Role.LISTENER &&
+                acc.getProfile().getUsername().equals(VALID_USERNAME)
+            ));
+        }
+
+        @Test
+        @DisplayName("should not create account when verification code is invalid")
+        void verifyRegistration_invalidCode_doesNotCreateAccount() {
+            VerifyRegistrationRequest request = new VerifyRegistrationRequest(
+                UUID.randomUUID(),
+                VALID_EMAIL,
+                "000000"
+            );
+            when(registrationVerificationService.verifyCode(request))
+                .thenThrow(new InvalidRegistrationVerificationException("Verification code is incorrect."));
+
+            assertThatThrownBy(() -> authService.verifyRegistration(request))
+                .isInstanceOf(InvalidRegistrationVerificationException.class);
+
+            verify(accountRepository, never()).save(any());
+            verify(refreshTokenRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should cancel registration verification through verification service")
+        void cancelRegistration_delegates() {
+            CancelRegistrationVerificationRequest request = new CancelRegistrationVerificationRequest(
+                UUID.randomUUID(),
+                VALID_EMAIL
+            );
+
+            authService.cancelRegistration(request);
+
+            verify(registrationVerificationService).cancel(request);
         }
     }
 
@@ -231,6 +282,224 @@ class AuthServiceImplTest {
                 .isInstanceOf(InvalidCredentialsException.class);
             assertThatThrownBy(() -> authService.login(withWrongPass))
                 .isInstanceOf(InvalidCredentialsException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("Google auth")
+    class GoogleLoginTests {
+
+        @Test
+        @DisplayName("should reject weak password during email registration")
+        void startRegistration_weakPassword_throwsException() {
+            RegisterRequest request = new RegisterRequest(VALID_EMAIL, VALID_USERNAME, "password1!");
+
+            assertThatThrownBy(() -> authService.startRegistration(request))
+                .isInstanceOf(PasswordPolicyException.class)
+                .hasMessageContaining("uppercase");
+        }
+
+        @Test
+        @DisplayName("should log in existing user without creating duplicate account")
+        void googleLogin_existingEmail_doesNotDuplicateUser() {
+            GoogleUserInfo googleUser = new GoogleUserInfo("google-sub-1", VALID_EMAIL, "Test User");
+
+            when(accountRepository.findByEmail(VALID_EMAIL)).thenReturn(Optional.of(activeAccount));
+            when(accountRepository.save(activeAccount)).thenReturn(activeAccount);
+            stubTokenPair(activeAccount);
+
+            GoogleAuthenticationResult result = authService.authenticateWithGoogle(
+                googleUser,
+                GoogleOAuthMode.LOGIN
+            );
+
+            assertThat(result.loginResponse().accessToken()).isEqualTo(ACCESS_TOKEN);
+            assertThat(result.passwordSetupRequired()).isFalse();
+            assertThat(activeAccount.getGoogleSubject()).isEqualTo("google-sub-1");
+            verify(accountRepository).findByEmail(VALID_EMAIL);
+            verify(accountRepository).save(activeAccount);
+            verify(profileRepository, never()).existsByUsername(any());
+        }
+
+        @Test
+        @DisplayName("should create listener account when Google register email does not exist")
+        void googleRegister_newEmail_createsUser() {
+            GoogleUserInfo googleUser = new GoogleUserInfo(
+                "google-sub-2",
+                "google@example.com",
+                "Google User"
+            );
+
+            when(accountRepository.findByEmail("google@example.com")).thenReturn(Optional.empty());
+            when(profileRepository.existsByUsername("google_user")).thenReturn(false);
+            when(passwordEncoder.encode(any())).thenReturn(HASHED_PASSWORD);
+            when(accountRepository.save(any(UserAccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(jwtService.generateAccessToken(any())).thenReturn(ACCESS_TOKEN);
+            when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
+            when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jwtService.getAccessTokenExpirySeconds()).thenReturn(EXPIRY_SECONDS);
+
+            GoogleAuthenticationResult result = authService.authenticateWithGoogle(
+                googleUser,
+                GoogleOAuthMode.REGISTER
+            );
+
+            assertThat(result.loginResponse().accessToken()).isEqualTo(ACCESS_TOKEN);
+            assertThat(result.passwordSetupRequired()).isTrue();
+            verify(accountRepository).save(argThat(acc ->
+                acc.getEmail().equals("google@example.com") &&
+                acc.getGoogleSubject().equals("google-sub-2") &&
+                acc.getRole() == Role.LISTENER &&
+                acc.isPasswordSetupRequired() &&
+                acc.getProfile().getUsername().equals("google_user")
+            ));
+        }
+
+        @Test
+        @DisplayName("should generate a safe alternative username on conflict")
+        void googleRegister_usernameConflict_generatesAlternative() {
+            GoogleUserInfo googleUser = new GoogleUserInfo(
+                "google-sub-3",
+                "google@example.com",
+                "Google User"
+            );
+
+            when(accountRepository.findByEmail("google@example.com")).thenReturn(Optional.empty());
+            when(profileRepository.existsByUsername("google_user")).thenReturn(true);
+            when(profileRepository.existsByUsername("google_user-2")).thenReturn(false);
+            when(passwordEncoder.encode(any())).thenReturn(HASHED_PASSWORD);
+            when(accountRepository.save(any(UserAccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(jwtService.generateAccessToken(any())).thenReturn(ACCESS_TOKEN);
+            when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
+            when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jwtService.getAccessTokenExpirySeconds()).thenReturn(EXPIRY_SECONDS);
+
+            authService.authenticateWithGoogle(googleUser, GoogleOAuthMode.REGISTER);
+
+            verify(accountRepository).save(argThat(acc ->
+                acc.getProfile().getUsername().equals("google_user-2")
+            ));
+        }
+
+        @Test
+        @DisplayName("should not create an account when Google login is used for an unknown email")
+        void googleLogin_unknownEmail_throwsException() {
+            GoogleUserInfo googleUser = new GoogleUserInfo("google-sub-4", "google@example.com", "Google User");
+            when(accountRepository.findByEmail("google@example.com")).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authService.authenticateWithGoogle(googleUser, GoogleOAuthMode.LOGIN))
+                .isInstanceOf(GoogleAuthenticationException.class)
+                .hasMessageContaining("Register with Google first");
+
+            verify(accountRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should prefer the oldest equivalent Gmail account and preserve its username")
+        void googleLogin_equivalentGmailAccount_preservesExistingUsername() {
+            UserAccountEntity originalAccount = UserAccountEntity.builder()
+                .id(UUID.randomUUID())
+                .email("uriel.ito2@gmail.com")
+                .passwordHash(HASHED_PASSWORD)
+                .role(Role.LISTENER)
+                .isActive(true)
+                .createdAt(Instant.parse("2026-05-10T00:00:00Z"))
+                .build();
+            originalAccount.setProfile(UserProfileEntity.builder()
+                .id(UUID.randomUUID())
+                .account(originalAccount)
+                .username("urielito2")
+                .build());
+
+            UserAccountEntity duplicateGoogleAccount = UserAccountEntity.builder()
+                .id(UUID.randomUUID())
+                .email("urielito2@gmail.com")
+                .passwordHash(HASHED_PASSWORD)
+                .googleSubject("google-sub-existing")
+                .role(Role.LISTENER)
+                .isActive(true)
+                .createdAt(Instant.parse("2026-05-11T00:00:00Z"))
+                .build();
+            duplicateGoogleAccount.setProfile(UserProfileEntity.builder()
+                .id(UUID.randomUUID())
+                .account(duplicateGoogleAccount)
+                .username("uriel_cendon_diaz")
+                .build());
+
+            GoogleUserInfo googleUser = new GoogleUserInfo(
+                "google-sub-existing",
+                "urielito2@gmail.com",
+                "Uriel Cendon Diaz"
+            );
+
+            when(accountRepository.findByGoogleSubject("google-sub-existing"))
+                .thenReturn(Optional.of(duplicateGoogleAccount));
+            when(accountRepository.findByEmail("urielito2@gmail.com"))
+                .thenReturn(Optional.of(duplicateGoogleAccount));
+            when(accountRepository.findAllByEmailEndingWithIgnoreCase("@gmail.com"))
+                .thenReturn(List.of(originalAccount, duplicateGoogleAccount));
+            when(accountRepository.findAllByEmailEndingWithIgnoreCase("@googlemail.com"))
+                .thenReturn(List.of());
+            when(accountRepository.save(any(UserAccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+            stubTokenPair(originalAccount);
+
+            GoogleAuthenticationResult result = authService.authenticateWithGoogle(
+                googleUser,
+                GoogleOAuthMode.LOGIN
+            );
+
+            assertThat(result.passwordSetupRequired()).isFalse();
+            assertThat(result.loginResponse().accessToken()).isEqualTo(ACCESS_TOKEN);
+            assertThat(originalAccount.getGoogleSubject()).isEqualTo("google-sub-existing");
+            assertThat(duplicateGoogleAccount.getGoogleSubject()).isNull();
+            assertThat(originalAccount.getProfile().getUsername()).isEqualTo("urielito2");
+        }
+
+        @Test
+        @DisplayName("should complete Google password setup when confirmation and policy are valid")
+        void completeGooglePasswordSetup_success() {
+            UserAccountEntity googleAccount = UserAccountEntity.builder()
+                .id(accountId)
+                .email(VALID_EMAIL)
+                .passwordHash(HASHED_PASSWORD)
+                .role(Role.LISTENER)
+                .isActive(true)
+                .passwordSetupRequired(true)
+                .build();
+
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(googleAccount));
+            when(passwordEncoder.encode("SecurePass1!")).thenReturn("$2a$12$newhash");
+
+            authService.completeGooglePasswordSetup(
+                accountId,
+                new SetupPasswordRequest("SecurePass1!", "SecurePass1!")
+            );
+
+            assertThat(googleAccount.isPasswordSetupRequired()).isFalse();
+            assertThat(googleAccount.getPasswordHash()).isEqualTo("$2a$12$newhash");
+            verify(accountRepository).save(googleAccount);
+        }
+
+        @Test
+        @DisplayName("should reject Google password setup when confirmation does not match")
+        void completeGooglePasswordSetup_confirmationMismatch() {
+            UserAccountEntity googleAccount = UserAccountEntity.builder()
+                .id(accountId)
+                .email(VALID_EMAIL)
+                .passwordHash(HASHED_PASSWORD)
+                .role(Role.LISTENER)
+                .isActive(true)
+                .passwordSetupRequired(true)
+                .build();
+
+            when(accountRepository.findById(accountId)).thenReturn(Optional.of(googleAccount));
+
+            assertThatThrownBy(() -> authService.completeGooglePasswordSetup(
+                accountId,
+                new SetupPasswordRequest("SecurePass1!", "SecurePass2!")
+            ))
+                .isInstanceOf(PasswordPolicyException.class)
+                .hasMessageContaining("confirmation");
         }
     }
 
@@ -348,5 +617,12 @@ class AuthServiceImplTest {
 
             verify(refreshTokenRepository, never()).deleteByTokenValue(any());
         }
+    }
+
+    private void stubTokenPair(UserAccountEntity account) {
+        when(jwtService.generateAccessToken(account)).thenReturn(ACCESS_TOKEN);
+        when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
+        when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.getAccessTokenExpirySeconds()).thenReturn(EXPIRY_SECONDS);
     }
 }

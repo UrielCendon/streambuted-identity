@@ -11,14 +11,20 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import streambuted.identity.dto.*;
+import streambuted.identity.exception.IdentityException;
 import streambuted.identity.security.JwtProperties;
 import streambuted.identity.security.RsaJwtKeyProvider;
 import streambuted.identity.service.AuthService;
+import streambuted.identity.service.oauth.GoogleOAuthMode;
+import streambuted.identity.service.oauth.GoogleOAuthService;
+import streambuted.identity.service.oauth.GoogleUserInfo;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Handles public authentication endpoints under /api/v1/auth.
@@ -31,24 +37,55 @@ import java.util.Map;
 public class AuthController {
 
     private static final String REFRESH_COOKIE_NAME = "refresh_token";
+    private static final String GOOGLE_STATE_COOKIE_NAME = "google_oauth_state";
+    private static final String GOOGLE_MODE_COOKIE_NAME = "google_oauth_mode";
 
     private final AuthService authService;
     private final JwtProperties jwtProperties;
     private final Environment environment;
     private final RsaJwtKeyProvider rsaJwtKeyProvider;
+    private final GoogleOAuthService googleOAuthService;
 
     @Value("${app.security.refresh-cookie.path:/api/v1/auth/refresh}")
     private String refreshCookiePath;
 
     /**
      * POST /api/v1/auth/register
-     * Creates a new account with role LISTENER and returns a token pair.
+     * Starts registration and sends a 6-digit verification code by email.
      */
     @PostMapping("/register")
-    public ResponseEntity<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<RegistrationVerificationResponse> register(
+        @Valid @RequestBody RegisterRequest request
+    ) {
         log.debug("Registration attempt for email={}", request.email());
-        LoginResponse response = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        RegistrationVerificationResponse response = authService.startRegistration(request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    @PostMapping("/register/resend")
+    public ResponseEntity<RegistrationVerificationResponse> resendRegistrationCode(
+        @Valid @RequestBody ResendRegistrationCodeRequest request
+    ) {
+        RegistrationVerificationResponse response = authService.resendRegistrationCode(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/register/verify")
+    public ResponseEntity<LoginResponse> verifyRegistration(
+        @Valid @RequestBody VerifyRegistrationRequest request,
+        HttpServletResponse servletResponse
+    ) {
+        LoginResponse response = authService.verifyRegistration(request);
+        attachRefreshTokenCookie(servletResponse, response.refreshToken());
+        return ResponseEntity.status(HttpStatus.CREATED).body(hideRefreshToken(response));
+    }
+
+    @PostMapping("/register/cancel")
+    public ResponseEntity<Void> cancelRegistration(
+        @Valid @RequestBody CancelRegistrationVerificationRequest request
+    ) {
+        authService.cancelRegistration(request);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -95,6 +132,89 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/google")
+    public ResponseEntity<Void> startGoogleOAuth(
+        @RequestParam(name = "mode", required = false, defaultValue = "login") String mode
+    ) {
+        try {
+            GoogleOAuthMode oauthMode = GoogleOAuthMode.fromValue(mode);
+            String state = UUID.randomUUID().toString();
+            String authorizationUrl = googleOAuthService.buildAuthorizationUrl(state);
+
+            ResponseCookie stateCookie = ResponseCookie.from(GOOGLE_STATE_COOKIE_NAME, state)
+                .httpOnly(true)
+                .secure(isProductionProfile())
+                .sameSite("Lax")
+                .path("/api/v1/auth/google/callback")
+                .maxAge(Duration.ofMinutes(5))
+                .build();
+
+            ResponseCookie modeCookie = ResponseCookie.from(
+                    GOOGLE_MODE_COOKIE_NAME,
+                    oauthMode.name().toLowerCase()
+                )
+                .httpOnly(true)
+                .secure(isProductionProfile())
+                .sameSite("Lax")
+                .path("/api/v1/auth/google/callback")
+                .maxAge(Duration.ofMinutes(5))
+                .build();
+
+            return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.LOCATION, authorizationUrl)
+                .header(HttpHeaders.SET_COOKIE, stateCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, modeCookie.toString())
+                .build();
+        } catch (IdentityException ex) {
+            log.warn("Google OAuth start failed: {}", ex.getMessage());
+            return redirectToFrontend("google-error", ex.getMessage());
+        }
+    }
+
+    @GetMapping("/google/callback")
+    public ResponseEntity<Void> googleCallback(
+        @RequestParam(name = "code", required = false) String code,
+        @RequestParam(name = "state", required = false) String state,
+        @RequestParam(name = "error", required = false) String error,
+        @CookieValue(name = GOOGLE_STATE_COOKIE_NAME, required = false) String stateCookie,
+        @CookieValue(name = GOOGLE_MODE_COOKIE_NAME, required = false) String modeCookie,
+        HttpServletResponse servletResponse
+    ) {
+        clearGoogleStateCookie(servletResponse);
+        clearGoogleModeCookie(servletResponse);
+
+        if (error != null && !error.isBlank()) {
+            return redirectToFrontend("google-error", "Google OAuth was cancelled or rejected.");
+        }
+
+        try {
+            GoogleOAuthMode mode = GoogleOAuthMode.fromValue(modeCookie);
+            googleOAuthService.validateState(state, stateCookie);
+            GoogleUserInfo googleUserInfo = googleOAuthService.exchangeCode(code);
+            GoogleAuthenticationResult result = authService.authenticateWithGoogle(googleUserInfo, mode);
+            LoginResponse response = result.loginResponse();
+            attachRefreshTokenCookie(servletResponse, response.refreshToken());
+            return redirectToFrontend(
+                result.passwordSetupRequired() ? "google-password-setup" : "google-success",
+                result.passwordSetupRequired()
+                    ? "Complete your password setup to finish Google registration."
+                    : "Google sign-in completed."
+            );
+        } catch (IdentityException ex) {
+            log.warn("Google OAuth failed: {}", ex.getMessage());
+            return redirectToFrontend("google-error", ex.getMessage());
+        }
+    }
+
+    @PostMapping("/password/setup")
+    public ResponseEntity<Void> completeGooglePasswordSetup(
+        @AuthenticationPrincipal UUID userId,
+        @Valid @RequestBody SetupPasswordRequest request
+    ) {
+        authService.completeGooglePasswordSetup(userId, request);
+        return ResponseEntity.noContent().build();
+    }
+
     /**
      * GET /api/v1/auth/.well-known/jwks.json
      * Publishes the JSON Web Key Set (JWKS) used by other services to validate
@@ -127,6 +247,36 @@ public class AuthController {
             .build();
 
         servletResponse.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private void clearGoogleStateCookie(HttpServletResponse servletResponse) {
+        ResponseCookie cookie = ResponseCookie.from(GOOGLE_STATE_COOKIE_NAME, "")
+            .httpOnly(true)
+            .secure(isProductionProfile())
+            .sameSite("Lax")
+            .path("/api/v1/auth/google/callback")
+            .maxAge(Duration.ZERO)
+            .build();
+
+        servletResponse.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private void clearGoogleModeCookie(HttpServletResponse servletResponse) {
+        ResponseCookie cookie = ResponseCookie.from(GOOGLE_MODE_COOKIE_NAME, "")
+            .httpOnly(true)
+            .secure(isProductionProfile())
+            .sameSite("Lax")
+            .path("/api/v1/auth/google/callback")
+            .maxAge(Duration.ZERO)
+            .build();
+
+        servletResponse.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private ResponseEntity<Void> redirectToFrontend(String status, String message) {
+        return ResponseEntity.status(HttpStatus.FOUND)
+            .header(HttpHeaders.LOCATION, googleOAuthService.buildFrontendRedirect(status, message))
+            .build();
     }
 
     private LoginResponse hideRefreshToken(LoginResponse response) {

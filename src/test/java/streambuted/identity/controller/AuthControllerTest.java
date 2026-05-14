@@ -15,10 +15,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import streambuted.identity.dto.LoginRequest;
 import streambuted.identity.dto.LoginResponse;
+import streambuted.identity.dto.RegistrationVerificationResponse;
+import streambuted.identity.dto.RegisterRequest;
+import streambuted.identity.dto.VerifyRegistrationRequest;
 import streambuted.identity.security.JwtProperties;
 import streambuted.identity.security.JwtService;
 import streambuted.identity.security.RsaJwtKeyProvider;
 import streambuted.identity.service.AuthService;
+import streambuted.identity.service.oauth.GoogleOAuthService;
+
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.verify;
@@ -51,9 +57,69 @@ class AuthControllerTest {
     @MockBean
     private RsaJwtKeyProvider rsaJwtKeyProvider;
 
+    @MockBean
+    private GoogleOAuthService googleOAuthService;
+
     @BeforeEach
     void setUp() {
         when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
+    }
+
+    @Test
+    @DisplayName("register should start verification and not emit auth cookies")
+    void register_startsVerification() throws Exception {
+        RegisterRequest request = new RegisterRequest(
+            "listener@streambuted.com",
+            "listener",
+            "SecurePass1!"
+        );
+        UUID attemptId = UUID.randomUUID();
+
+        when(authService.startRegistration(ArgumentMatchers.any(RegisterRequest.class)))
+            .thenReturn(new RegistrationVerificationResponse(
+                attemptId,
+                "listener@streambuted.com",
+                "pending",
+                900L,
+                "Verification code sent."
+            ));
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isAccepted())
+            .andExpect(jsonPath("$.attemptId").value(attemptId.toString()))
+            .andExpect(jsonPath("$.email").value("listener@streambuted.com"))
+            .andExpect(jsonPath("$.status").value("pending"))
+            .andExpect(jsonPath("$.expiresInSeconds").value(900))
+            .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    @DisplayName("verify registration should create session cookie and hide refresh token")
+    void verifyRegistration_setsRefreshCookieAndHidesToken() throws Exception {
+        VerifyRegistrationRequest request = new VerifyRegistrationRequest(
+            UUID.randomUUID(),
+            "listener@streambuted.com",
+            "123456"
+        );
+        LoginResponse serviceResponse = new LoginResponse(
+            "access-token-value",
+            "refresh-token-value",
+            "listener",
+            900L
+        );
+
+        when(authService.verifyRegistration(ArgumentMatchers.any(VerifyRegistrationRequest.class)))
+            .thenReturn(serviceResponse);
+
+        mockMvc.perform(post("/api/v1/auth/register/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.accessToken").value("access-token-value"))
+            .andExpect(jsonPath("$.refreshToken").doesNotExist())
+            .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refresh_token=refresh-token-value")));
     }
 
     @Test

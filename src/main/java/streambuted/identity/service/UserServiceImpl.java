@@ -222,6 +222,7 @@ public class UserServiceImpl implements UserService {
             profile.getProfileImageAssetId(),
             account.getRole().name().toLowerCase(),
             account.isActive(),
+            account.isPasswordSetupRequired(),
             account.getCreatedAt()
         );
     }

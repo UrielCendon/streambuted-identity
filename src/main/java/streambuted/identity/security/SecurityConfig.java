@@ -49,9 +49,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public auth endpoints
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/register/resend").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/register/verify").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/register/cancel").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/google").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/google/callback").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/.well-known/jwks.json").permitAll()
                 // Actuator health — no auth required for infrastructure checks
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()

@@ -34,6 +34,33 @@ spring:
     password: ${RABBITMQ_PASSWORD}
     virtual-host: ${RABBITMQ_VHOST:/}
 
+  mail:
+    host: ${EMAIL_HOST:localhost}
+    port: ${EMAIL_PORT:1025}
+    username: ${EMAIL_USER:}
+    password: ${EMAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${EMAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${EMAIL_STARTTLS_ENABLE:false}
+          ssl:
+            enable: ${EMAIL_SECURE:false}
+
+app:
+  email:
+    from: ${EMAIL_FROM:no-reply-streambuted@example.com}
+    verification-subject: ${EMAIL_VERIFICATION_SUBJECT:StreamButed verification code}
+  registration:
+    verification-code-ttl: ${REGISTRATION_VERIFICATION_CODE_TTL:15m}
+  google:
+    oauth:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
+      callback-url: ${GOOGLE_CALLBACK_URL:http://localhost/api/v1/auth/google/callback}
+      frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
 # ── gRPC server ─────────────────────────────────────────────────────────────
 grpc:
   server:
@@ -68,6 +95,9 @@ media:
 
 # ── Actuator ────────────────────────────────────────────────────────────────
 management:
+  health:
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:

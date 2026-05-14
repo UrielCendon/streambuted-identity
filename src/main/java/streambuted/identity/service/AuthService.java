@@ -1,6 +1,10 @@
 package streambuted.identity.service;
 
 import streambuted.identity.dto.*;
+import streambuted.identity.service.oauth.GoogleOAuthMode;
+import streambuted.identity.service.oauth.GoogleUserInfo;
+
+import java.util.UUID;
 
 /**
  * Contract for authentication operations.
@@ -9,10 +13,38 @@ import streambuted.identity.dto.*;
 public interface AuthService {
 
     /**
-     * Registers a new user account with role LISTENER.
-     * Throws EmailAlreadyExistsException if the email is taken.
+     * Starts an email registration attempt and sends a verification code.
+     * No account is created until verifyRegistration succeeds.
      */
-    LoginResponse register(RegisterRequest request);
+    RegistrationVerificationResponse startRegistration(RegisterRequest request);
+
+    /**
+     * Invalidates the previous active code for an attempt and sends a fresh one.
+     */
+    RegistrationVerificationResponse resendRegistrationCode(ResendRegistrationCodeRequest request);
+
+    /**
+     * Completes registration only after the 6-digit verification code is valid.
+     */
+    LoginResponse verifyRegistration(VerifyRegistrationRequest request);
+
+    /**
+     * Cancels a pending registration verification attempt.
+     */
+    void cancelRegistration(CancelRegistrationVerificationRequest request);
+
+    /**
+     * Creates or resolves a StreamButed account from a verified Google profile.
+     */
+    GoogleAuthenticationResult authenticateWithGoogle(
+        GoogleUserInfo googleUserInfo,
+        GoogleOAuthMode mode
+    );
+
+    /**
+     * Completes password setup for accounts created through Google registration.
+     */
+    void completeGooglePasswordSetup(UUID userId, SetupPasswordRequest request);
 
     /**
      * Authenticates a user and issues a JWT + refresh token pair.

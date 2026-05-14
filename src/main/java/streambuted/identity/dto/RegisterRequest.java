@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * Payload for POST /api/v1/auth/register.
- * All new accounts start as LISTENER — role cannot be selected at registration.
+ * All new accounts start as LISTENER; role cannot be selected at registration.
  */
 public record RegisterRequest(
 

@@ -11,9 +11,18 @@ import streambuted.identity.exception.*;
 import streambuted.identity.repository.*;
 import streambuted.identity.security.JwtProperties;
 import streambuted.identity.security.JwtService;
+import streambuted.identity.service.oauth.GoogleOAuthMode;
+import streambuted.identity.service.oauth.GoogleUserInfo;
 
+import java.text.Normalizer;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Handles user registration, login, and refresh-token rotation.
@@ -29,46 +38,76 @@ import java.util.UUID;
 public class AuthServiceImpl implements AuthService {
 
     private final UserAccountRepository accountRepository;
+    private final UserProfileRepository  profileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder        passwordEncoder;
     private final JwtService             jwtService;
     private final JwtProperties          jwtProperties;
+    private final RegistrationVerificationService registrationVerificationService;
 
-    // ── Registration ──────────────────────────────────────────────────────────
+    private static final Pattern NON_USERNAME_CHARS = Pattern.compile("[^a-z0-9._-]");
+    private static final Pattern PASSWORD_UPPERCASE = Pattern.compile(".*[A-Z].*");
+    private static final Pattern PASSWORD_DIGIT = Pattern.compile(".*\\d.*");
+    private static final Pattern PASSWORD_SPECIAL = Pattern.compile(".*[^A-Za-z0-9].*");
+
+    // Registration
 
     @Override
-    public LoginResponse register(RegisterRequest request) {
-        if (accountRepository.existsByEmail(request.email())) {
-            throw new EmailAlreadyExistsException(request.email());
-        }
+    public RegistrationVerificationResponse startRegistration(RegisterRequest request) {
+        RegisterRequest normalizedRequest = normalizeRegisterRequest(request);
+        validatePasswordPolicy(normalizedRequest.password());
+        assertEmailAvailable(normalizedRequest.email());
+        assertUsernameAvailable(normalizedRequest.username());
 
-        // Build and persist the account entity
+        String passwordHash = passwordEncoder.encode(normalizedRequest.password());
+        return registrationVerificationService.startRegistration(normalizedRequest, passwordHash);
+    }
+
+    @Override
+    public RegistrationVerificationResponse resendRegistrationCode(
+        ResendRegistrationCodeRequest request
+    ) {
+        assertEmailAvailable(normalizeEmail(request.email()));
+        return registrationVerificationService.resendCode(request);
+    }
+
+    @Override
+    public LoginResponse verifyRegistration(VerifyRegistrationRequest request) {
+        RegistrationVerificationEntity attempt = registrationVerificationService.verifyCode(request);
+        assertEmailAvailable(attempt.getEmail());
+        assertUsernameAvailable(attempt.getUsername());
+
         UserAccountEntity account = UserAccountEntity.builder()
-            .email(request.email())
-            .passwordHash(passwordEncoder.encode(request.password()))
+            .email(attempt.getEmail())
+            .passwordHash(attempt.getPasswordHash())
             .role(Role.LISTENER)
             .isActive(true)
             .build();
 
-        // Build the profile with the provided username
         UserProfileEntity profile = UserProfileEntity.builder()
             .account(account)
-            .username(request.username())
+            .username(attempt.getUsername())
             .build();
 
         account.setProfile(profile);
 
         accountRepository.save(account);
-        log.info("Registered new user: email={}, id={}", account.getEmail(), account.getId());
+        log.info("Verified registration for email={}, id={}", account.getEmail(), account.getId());
 
         return buildTokenPair(account);
     }
 
-    // ── Login ─────────────────────────────────────────────────────────────────
+    @Override
+    public void cancelRegistration(CancelRegistrationVerificationRequest request) {
+        registrationVerificationService.cancel(request);
+    }
+
+    // Login
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        UserAccountEntity account = accountRepository.findByEmail(request.email())
+        String normalizedEmail = normalizeEmail(request.email());
+        UserAccountEntity account = resolvePrimaryAccountByEmail(normalizedEmail)
             .orElseThrow(InvalidCredentialsException::new);
 
         if (!account.isActive()) {
@@ -83,7 +122,56 @@ public class AuthServiceImpl implements AuthService {
         return buildTokenPair(account);
     }
 
-    // ── Refresh ───────────────────────────────────────────────────────────────
+    @Override
+    public GoogleAuthenticationResult authenticateWithGoogle(
+        GoogleUserInfo googleUserInfo,
+        GoogleOAuthMode mode
+    ) {
+        String email = normalizeEmail(googleUserInfo.email());
+        Optional<UserAccountEntity> accountBySubject = accountRepository.findByGoogleSubject(
+            googleUserInfo.subject()
+        );
+        List<UserAccountEntity> equivalentAccounts = findEquivalentAccountsByEmail(email);
+
+        UserAccountEntity account = resolveGoogleAccount(
+            googleUserInfo,
+            mode,
+            email,
+            accountBySubject,
+            equivalentAccounts
+        );
+
+        if (!account.isActive()) {
+            throw new InvalidCredentialsException();
+        }
+
+        log.info("Successful Google auth for userId={}", account.getId());
+        return new GoogleAuthenticationResult(
+            buildTokenPair(account),
+            account.isPasswordSetupRequired()
+        );
+    }
+
+    @Override
+    public void completeGooglePasswordSetup(UUID userId, SetupPasswordRequest request) {
+        UserAccountEntity account = accountRepository.findById(userId)
+            .orElseThrow(() -> new UserNotFoundException(userId.toString()));
+
+        if (!account.isPasswordSetupRequired()) {
+            throw new PasswordSetupNotRequiredException();
+        }
+
+        validatePasswordPolicy(request.password());
+        if (!request.password().equals(request.confirmPassword())) {
+            throw new PasswordPolicyException("Password confirmation does not match.");
+        }
+
+        account.setPasswordHash(passwordEncoder.encode(request.password()));
+        account.setPasswordSetupRequired(false);
+        accountRepository.save(account);
+    }
+
+    // Refresh
 
     @Override
     public LoginResponse refresh(String refreshToken) {
@@ -100,7 +188,7 @@ public class AuthServiceImpl implements AuthService {
             throw new InvalidRefreshTokenException();
         }
 
-        // Revoke the used token — prevents replay attacks (token rotation)
+        // Revoke the used token to prevent replay attacks.
         storedToken.setRevoked(true);
         refreshTokenRepository.save(storedToken);
 
@@ -120,16 +208,230 @@ public class AuthServiceImpl implements AuthService {
         log.info("Logout completed. Invalidated refresh token rows={}", deletedRows);
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    // Private helpers
+
+    private RegisterRequest normalizeRegisterRequest(RegisterRequest request) {
+        return new RegisterRequest(
+            normalizeEmail(request.email()),
+            request.username().trim(),
+            request.password()
+        );
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void assertEmailAvailable(String email) {
+        if (!findEquivalentAccountsByEmail(email).isEmpty()) {
+            throw new EmailAlreadyExistsException(email);
+        }
+    }
+
+    private void assertUsernameAvailable(String username) {
+        if (profileRepository.existsByUsername(username)) {
+            throw new UsernameAlreadyExistsException(username);
+        }
+    }
+
+    private UserAccountEntity linkGoogleSubject(
+        UserAccountEntity account,
+        String googleSubject
+    ) {
+        if (googleSubject.equals(account.getGoogleSubject())) {
+            return account;
+        }
+
+        if (account.getGoogleSubject() == null || account.getGoogleSubject().isBlank()) {
+            account.setGoogleSubject(googleSubject);
+            return accountRepository.save(account);
+        }
+
+        return account;
+    }
+
+    private UserAccountEntity createGoogleAccount(GoogleUserInfo googleUserInfo, String email) {
+        String username = generateGoogleUsername(googleUserInfo.name(), email);
+        String generatedPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
+
+        UserAccountEntity account = UserAccountEntity.builder()
+            .email(email)
+            .passwordHash(generatedPasswordHash)
+            .googleSubject(googleUserInfo.subject())
+            .role(Role.LISTENER)
+            .isActive(true)
+            .passwordSetupRequired(true)
+            .build();
+
+        UserProfileEntity profile = UserProfileEntity.builder()
+            .account(account)
+            .username(username)
+            .build();
+
+        account.setProfile(profile);
+        return accountRepository.save(account);
+    }
+
+    private String generateGoogleUsername(String displayName, String email) {
+        String base = displayName == null || displayName.isBlank()
+            ? email.substring(0, email.indexOf('@'))
+            : displayName;
+
+        base = Normalizer.normalize(base, Normalizer.Form.NFD)
+            .replaceAll("\\p{M}", "")
+            .toLowerCase(Locale.ROOT)
+            .trim()
+            .replaceAll("\\s+", "_");
+        base = NON_USERNAME_CHARS.matcher(base).replaceAll("");
+
+        if (base.length() < 3) {
+            base = "user_" + base;
+        }
+
+        base = base.substring(0, Math.min(base.length(), 50));
+
+        if (!profileRepository.existsByUsername(base)) {
+            return base;
+        }
+
+        for (int suffix = 2; suffix < 1_000; suffix++) {
+            String suffixText = "-" + suffix;
+            String prefix = base.substring(0, Math.min(base.length(), 50 - suffixText.length()));
+            String candidate = prefix + suffixText;
+            if (!profileRepository.existsByUsername(candidate)) {
+                return candidate;
+            }
+        }
+
+        throw new UsernameAlreadyExistsException(base);
+    }
+
+    private void validatePasswordPolicy(String password) {
+        if (password == null || password.isBlank()) {
+            throw new PasswordPolicyException("Password must not be blank.");
+        }
+
+        if (!PASSWORD_UPPERCASE.matcher(password).matches()) {
+            throw new PasswordPolicyException("Password must contain at least one uppercase letter.");
+        }
+
+        if (!PASSWORD_DIGIT.matcher(password).matches()) {
+            throw new PasswordPolicyException("Password must contain at least one number.");
+        }
+
+        if (!PASSWORD_SPECIAL.matcher(password).matches()) {
+            throw new PasswordPolicyException("Password must contain at least one special character.");
+        }
+    }
+
+    private UserAccountEntity resolveGoogleAccount(
+        GoogleUserInfo googleUserInfo,
+        GoogleOAuthMode mode,
+        String normalizedEmail,
+        Optional<UserAccountEntity> accountBySubject,
+        List<UserAccountEntity> equivalentAccounts
+    ) {
+        Optional<UserAccountEntity> primaryAccount = selectPrimaryAccount(equivalentAccounts);
+
+        if (primaryAccount.isPresent()) {
+            UserAccountEntity primary = primaryAccount.get();
+            accountBySubject
+                .filter(existing -> !existing.getId().equals(primary.getId()))
+                .ifPresent(this::detachGoogleSubject);
+            return linkGoogleSubject(primary, googleUserInfo.subject());
+        }
+
+        if (accountBySubject.isPresent()) {
+            return accountBySubject.get();
+        }
+
+        if (mode == GoogleOAuthMode.LOGIN) {
+            throw new GoogleAuthenticationException(
+                "No account is linked to this email. Register with Google first."
+            );
+        }
+
+        return createGoogleAccount(googleUserInfo, normalizedEmail);
+    }
+
+    private void detachGoogleSubject(UserAccountEntity account) {
+        account.setGoogleSubject(null);
+        accountRepository.save(account);
+    }
+
+    private Optional<UserAccountEntity> resolvePrimaryAccountByEmail(String normalizedEmail) {
+        return selectPrimaryAccount(findEquivalentAccountsByEmail(normalizedEmail));
+    }
+
+    private Optional<UserAccountEntity> selectPrimaryAccount(List<UserAccountEntity> accounts) {
+        return accounts.stream()
+            .sorted(
+                Comparator
+                    .comparing(UserAccountEntity::isPasswordSetupRequired)
+                    .thenComparing(
+                        UserAccountEntity::getCreatedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                    )
+                    .thenComparing(UserAccountEntity::getId, Comparator.nullsLast(Comparator.naturalOrder()))
+            )
+            .findFirst();
+    }
+
+    private List<UserAccountEntity> findEquivalentAccountsByEmail(String normalizedEmail) {
+        Optional<UserAccountEntity> exact = accountRepository.findByEmail(normalizedEmail);
+        if (!isGmailAddress(normalizedEmail)) {
+            return exact.stream().toList();
+        }
+
+        String canonicalEmail = canonicalizeEmail(normalizedEmail);
+        List<UserAccountEntity> gmailAccounts = accountRepository.findAllByEmailEndingWithIgnoreCase(
+            "@gmail.com"
+        );
+        List<UserAccountEntity> googlemailAccounts = accountRepository.findAllByEmailEndingWithIgnoreCase(
+            "@googlemail.com"
+        );
+
+        return Stream.concat(
+                Stream.concat(exact.stream(), gmailAccounts.stream()),
+                googlemailAccounts.stream()
+            )
+            .filter(account -> canonicalizeEmail(normalizeEmail(account.getEmail())).equals(canonicalEmail))
+            .distinct()
+            .toList();
+    }
+
+    private boolean isGmailAddress(String normalizedEmail) {
+        return normalizedEmail.endsWith("@gmail.com") || normalizedEmail.endsWith("@googlemail.com");
+    }
+
+    private String canonicalizeEmail(String normalizedEmail) {
+        int atIndex = normalizedEmail.indexOf('@');
+        if (atIndex < 0) {
+            return normalizedEmail;
+        }
+
+        String localPart = normalizedEmail.substring(0, atIndex);
+        if (!isGmailAddress(normalizedEmail)) {
+            return normalizedEmail;
+        }
+
+        int plusIndex = localPart.indexOf('+');
+        if (plusIndex >= 0) {
+            localPart = localPart.substring(0, plusIndex);
+        }
+
+        localPart = localPart.replace(".", "");
+        return localPart + "@gmail.com";
+    }
 
     /**
      * Issues a fresh JWT + refresh token pair and persists the refresh token.
      * Called after both successful login and refresh operations.
      */
     private LoginResponse buildTokenPair(UserAccountEntity account) {
-        String accessToken   = jwtService.generateAccessToken(account);
-        String refreshValue  = UUID.randomUUID().toString();
-        Instant expiresAt    = Instant.now().plusMillis(jwtProperties.getRefreshTokenExpiryMs());
+        String accessToken = jwtService.generateAccessToken(account);
+        String refreshValue = UUID.randomUUID().toString();
+        Instant expiresAt = Instant.now().plusMillis(jwtProperties.getRefreshTokenExpiryMs());
 
         RefreshTokenEntity refreshToken = RefreshTokenEntity.builder()
             .account(account)
