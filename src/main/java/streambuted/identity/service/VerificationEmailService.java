@@ -6,6 +6,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import streambuted.identity.config.EmailProperties;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 
 @Service
@@ -14,8 +16,10 @@ public class VerificationEmailService {
 
     private final JavaMailSender mailSender;
     private final EmailProperties emailProperties;
+    private final Clock clock;
 
     public void sendRegistrationCode(String email, String code, Instant expiresAt) {
+        long expiresInMinutes = Math.max(1, Duration.between(clock.instant(), expiresAt).toMinutes());
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(emailProperties.getFrom());
         message.setTo(email);
@@ -23,10 +27,10 @@ public class VerificationEmailService {
         message.setText("""
             Tu codigo de verificacion de StreamButed es: %s
 
-            El codigo expira en 15 minutos. Si no solicitaste este registro, puedes ignorar este correo.
+            El codigo expira en %d minutos. Si no solicitaste este registro, puedes ignorar este correo.
 
             Expira en: %s
-            """.formatted(code, expiresAt));
+            """.formatted(code, expiresInMinutes, expiresAt));
 
         mailSender.send(message);
     }

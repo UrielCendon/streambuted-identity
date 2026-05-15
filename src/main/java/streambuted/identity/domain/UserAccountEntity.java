@@ -10,7 +10,7 @@ import java.util.UUID;
 
 /**
  * Persists authentication credentials and role information.
- * The password is always stored as a BCrypt hash (cost 12) —
+ * The password is always stored as a BCrypt hash (cost 12).
  * plaintext values must never reach this entity.
  */
 @Entity
@@ -64,7 +64,7 @@ public class UserAccountEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    // Bidirectional convenience — profile is owned by UserProfileEntity
+    // Bidirectional convenience; profile is owned by UserProfileEntity.
     @OneToOne(mappedBy = "account", cascade = CascadeType.ALL, fetch = FetchType.LAZY, optional = false)
     private UserProfileEntity profile;
 }

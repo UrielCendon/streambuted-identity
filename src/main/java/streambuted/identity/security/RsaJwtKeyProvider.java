@@ -67,7 +67,7 @@ public class RsaJwtKeyProvider {
         return Map.of("keys", new Object[] { jwk() });
     }
 
-    // ── Loading / Generation ───────────────────────────────────────────────
+    // Loading and generation.
 
     private static KeyPair loadOrGenerateKeyPair(JwtProperties jwtProperties) {
         try {
@@ -151,7 +151,7 @@ public class RsaJwtKeyProvider {
         return Base64.getDecoder().decode(base64);
     }
 
-    // ── JWKS helpers ───────────────────────────────────────────────────────
+    // JWKS helpers.
 
     private static String base64UrlUnsigned(BigInteger bigInteger) {
         byte[] bytes = bigInteger.toByteArray();

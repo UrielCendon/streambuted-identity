@@ -5,7 +5,7 @@ spring:
   application:
     name: identity-service
 
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  # PostgreSQL
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/streambuted_identity}
     username: ${DB_USERNAME}
@@ -26,7 +26,7 @@ spring:
         format_sql: true
         default_schema: public
 
-  # ── RabbitMQ ────────────────────────────────────────────────────────────────
+  # RabbitMQ
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -61,14 +61,14 @@ app:
       callback-url: ${GOOGLE_CALLBACK_URL:http://localhost/api/v1/auth/google/callback}
       frontend-url: ${FRONTEND_URL:http://localhost:5173}
 
-# ── gRPC server ─────────────────────────────────────────────────────────────
+# gRPC server
 grpc:
   server:
     port: ${GRPC_PORT:9091}
     security:
       enabled: false          # TLS handled at the gateway/sidecar level
 
-# ── JWT ─────────────────────────────────────────────────────────────────────
+# JWT
 jwt:
   issuer: ${JWT_ISSUER:http://identity-service:8081}
   key-id: ${JWT_KEY_ID:}
@@ -79,7 +79,7 @@ jwt:
   access-token-expiry-ms: ${JWT_ACCESS_EXPIRY_MS:900000}      # 15 minutes
   refresh-token-expiry-ms: ${JWT_REFRESH_EXPIRY_MS:604800000} # 7 days
 
-# ── RabbitMQ exchange / queue names ─────────────────────────────────────────
+# RabbitMQ exchange / queue names
 messaging:
   exchange:
     identity: identity.events
@@ -93,7 +93,7 @@ media:
     target: ${MEDIA_GRPC_TARGET:media-service:9093}
     timeout-ms: ${MEDIA_GRPC_TIMEOUT_MS:2000}
 
-# ── Actuator ────────────────────────────────────────────────────────────────
+# Actuator
 management:
   health:
     mail:
@@ -106,7 +106,7 @@ management:
     health:
       show-details: when_authorized
 
-# ── Logging ─────────────────────────────────────────────────────────────────
+# Logging
 logging:
   level:
     root: INFO

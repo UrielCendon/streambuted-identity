@@ -30,7 +30,7 @@ public class RabbitMqConfig {
     @Value("${messaging.routing-key.user-promoted}")
     private String userPromotedRoutingKey;
 
-    // ── Exchange ──────────────────────────────────────────────────────────────
+    // Exchange.
 
     @Bean
     public TopicExchange identityExchange() {
@@ -39,14 +39,14 @@ public class RabbitMqConfig {
             .build();
     }
 
-    // ── Queues ────────────────────────────────────────────────────────────────
+    // Queues.
 
     @Bean
     public Queue userPromotedQueue() {
         return QueueBuilder.durable(userPromotedQueue).build();
     }
 
-    // ── Bindings ──────────────────────────────────────────────────────────────
+    // Bindings.
 
     @Bean
     public Binding userPromotedBinding(Queue userPromotedQueue, TopicExchange identityExchange) {
@@ -55,7 +55,7 @@ public class RabbitMqConfig {
             .with(userPromotedRoutingKey);
     }
 
-    // ── Message converter (JSON) ──────────────────────────────────────────────
+    // Message converter.
 
     @Bean
     public MessageConverter jacksonMessageConverter() {

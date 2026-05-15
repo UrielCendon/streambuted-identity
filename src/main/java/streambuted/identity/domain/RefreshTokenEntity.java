@@ -35,7 +35,7 @@ public class RefreshTokenEntity {
 
     /**
      * Opaque random value stored and compared in constant time.
-     * Never derived from JWT — it is a standalone credential.
+     * Never derived from JWT; it is a standalone credential.
      */
     @Column(name = "token_value", nullable = false, unique = true, length = 512)
     private String tokenValue;
@@ -51,7 +51,7 @@ public class RefreshTokenEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    // ── Convenience helpers ───────────────────────────────────────────────
+    // Convenience helpers.
 
     /** Returns true when this token may still be exchanged for a new JWT pair. */
     public boolean isValid() {

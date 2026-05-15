@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    // ── Domain exceptions (IdentityException hierarchy) ──────────────────────
+    // Domain exceptions.
 
     @ExceptionHandler(IdentityException.class)
     public ResponseEntity<ErrorResponse> handleIdentityException(IdentityException ex) {
@@ -39,7 +39,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getHttpStatus()).body(body);
     }
 
-    // ── Bean Validation failures (@Valid) ─────────────────────────────────────
+    // Bean Validation failures.
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
@@ -92,7 +92,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    // ── Spring Security ───────────────────────────────────────────────────────
+    // Spring Security.
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex) {

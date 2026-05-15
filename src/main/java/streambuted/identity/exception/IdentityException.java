@@ -3,7 +3,7 @@ package streambuted.identity.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-// ─── Custom exception hierarchy ─────────────────────────────────────────────
+// Custom exception hierarchy.
 
 /**
  * Base class for all domain-level exceptions in the Identity Service.

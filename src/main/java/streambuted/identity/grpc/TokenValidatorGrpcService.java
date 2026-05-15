@@ -100,7 +100,7 @@ public class TokenValidatorGrpcService extends TokenValidatorGrpc.TokenValidator
         responseObserver.onCompleted();
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    // Private helpers.
 
     private boolean isUuid(String value) {
         return value != null && UUID_PATTERN.matcher(value).matches();

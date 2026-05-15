@@ -16,7 +16,7 @@ import java.util.UUID;
 /**
  * Handles authenticated user endpoints under /api/v1/users.
  * Every endpoint in this controller requires a valid Bearer JWT.
- * The authenticated user's UUID is injected via @AuthenticationPrincipal —
+ * The authenticated user's UUID is injected via @AuthenticationPrincipal.
  * it is set by JwtAuthenticationFilter as the principal of the token.
  */
 @RestController

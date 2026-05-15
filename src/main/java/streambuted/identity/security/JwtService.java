@@ -36,7 +36,7 @@ public class JwtService {
     private final JwtProperties jwtProperties;
     private final RsaJwtKeyProvider rsaJwtKeyProvider;
 
-    // ── Token issuance ────────────────────────────────────────────────────────
+    // Token issuance.
 
     /**
      * Issues a signed access JWT for the given user account.
@@ -61,7 +61,7 @@ public class JwtService {
             .compact();
     }
 
-    // ── Claims extraction ─────────────────────────────────────────────────────
+    // Claims extraction.
 
     /**
      * Parses a JWT and returns its claims, or empty if the token is invalid.
@@ -101,7 +101,7 @@ public class JwtService {
         return extractClaims(token).isPresent();
     }
 
-    /** Access token lifetime in seconds — forwarded to the client as expiresIn. */
+    /** Access token lifetime in seconds, forwarded to the client as expiresIn. */
     public long getAccessTokenExpirySeconds() {
         return jwtProperties.getAccessTokenExpiryMs() / 1000;
     }

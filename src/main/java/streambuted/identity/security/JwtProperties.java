@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 /**
  * Binds JWT configuration from application.yml (prefix: jwt).
  * Values are injected from environment variables via ${...} placeholders
- * defined in the YAML — the secret itself is never hardcoded.
+ * defined in the YAML. The secret itself is never hardcoded.
  */
 @Component
 @ConfigurationProperties(prefix = "jwt")

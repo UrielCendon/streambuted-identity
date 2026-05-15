@@ -27,7 +27,7 @@ public interface UserService {
     );
 
     /**
-     * Promotes a LISTENER account to ARTIST — this action is irreversible.
+     * Promotes a LISTENER account to ARTIST. This action is irreversible.
      * Publishes a UserPromotedEvent to RabbitMQ upon success.
      * Throws RolePromotionException if the user is not a LISTENER.
      */

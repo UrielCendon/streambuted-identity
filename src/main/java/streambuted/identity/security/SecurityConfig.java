@@ -25,8 +25,8 @@ import java.util.List;
 /**
  * Security configuration for the Identity Service REST API.
  *
- * Session policy : STATELESS — all state is carried in the JWT.
- * CSRF           : disabled — not applicable for a stateless REST API.
+ * Session policy : STATELESS. All state is carried in the JWT.
+ * CSRF           : disabled. Not applicable for a stateless REST API.
  * Password hash  : BCrypt with cost factor 12.
  */
 @Configuration
@@ -58,7 +58,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/google").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/google/callback").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/.well-known/jwks.json").permitAll()
-                // Actuator health — no auth required for infrastructure checks
+                // Actuator health is public for infrastructure checks.
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 // Everything else requires a valid JWT
                 .anyRequest().authenticated()
@@ -69,7 +69,7 @@ public class SecurityConfig {
     }
 
     /**
-     * BCrypt with cost 12 — balances security against registration latency
+     * BCrypt with cost 12 balances security against registration latency.
      * (~300 ms on a modern server, acceptable for an infrequent operation).
      */
     @Bean

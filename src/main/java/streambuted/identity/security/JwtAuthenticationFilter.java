@@ -22,7 +22,7 @@ import java.util.UUID;
  * Validates the Bearer JWT on every incoming request and populates the
  * SecurityContext when the token is valid.
  *
- * Requests without a valid token are passed through without error —
+ * Requests without a valid token are passed through without error.
  * endpoint-level authorization rules decide whether they are allowed.
  */
 @Component

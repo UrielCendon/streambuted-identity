@@ -54,7 +54,7 @@ public interface AuthService {
 
     /**
      * Exchanges a valid refresh token for a new JWT + refresh token pair
-     * (token rotation — the old refresh token is revoked).
+     * (token rotation; the old refresh token is revoked).
      * Throws InvalidRefreshTokenException if the token is expired or revoked.
      */
     LoginResponse refresh(String refreshToken);

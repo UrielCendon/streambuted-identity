@@ -7,7 +7,9 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import streambuted.identity.config.EmailProperties;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -23,7 +25,8 @@ class VerificationEmailServiceTest {
         EmailProperties properties = new EmailProperties();
         properties.setFrom("no-reply-streambuted@example.com");
         properties.setVerificationSubject("Codigo StreamButed");
-        VerificationEmailService service = new VerificationEmailService(mailSender, properties);
+        Clock clock = Clock.fixed(Instant.parse("2026-05-13T12:00:00Z"), ZoneOffset.UTC);
+        VerificationEmailService service = new VerificationEmailService(mailSender, properties, clock);
 
         service.sendRegistrationCode(
             "new@example.com",
@@ -39,5 +42,6 @@ class VerificationEmailServiceTest {
         assertThat(message.getTo()).containsExactly("new@example.com");
         assertThat(message.getSubject()).isEqualTo("Codigo StreamButed");
         assertThat(message.getText()).contains("123456");
+        assertThat(message.getText()).contains("15 minutos");
     }
 }
