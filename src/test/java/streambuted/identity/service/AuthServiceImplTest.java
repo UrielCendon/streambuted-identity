@@ -348,14 +348,47 @@ class AuthServiceImplTest {
             );
 
             assertThat(result.loginResponse().accessToken()).isEqualTo(ACCESS_TOKEN);
-            assertThat(result.passwordSetupRequired()).isTrue();
+            assertThat(result.passwordSetupRequired()).isFalse();
             verify(accountRepository).save(argThat(acc ->
                 acc.getEmail().equals("google@example.com") &&
                 acc.getGoogleSubject().equals("google-sub-2") &&
                 acc.getRole() == Role.LISTENER &&
-                acc.isPasswordSetupRequired() &&
+                !acc.isPasswordSetupRequired() &&
                 acc.getProfile().getUsername().equals("google_user")
             ));
+        }
+
+        @Test
+        @DisplayName("should clear legacy Google password setup flag during Google auth")
+        void googleLogin_legacyPasswordSetupFlag_clearsFlag() {
+            UserAccountEntity legacyGoogleAccount = UserAccountEntity.builder()
+                .id(accountId)
+                .email(VALID_EMAIL)
+                .passwordHash(HASHED_PASSWORD)
+                .googleSubject("google-sub-legacy")
+                .role(Role.LISTENER)
+                .isActive(true)
+                .passwordSetupRequired(true)
+                .createdAt(Instant.parse("2026-05-10T00:00:00Z"))
+                .build();
+            legacyGoogleAccount.setProfile(profile);
+
+            GoogleUserInfo googleUser = new GoogleUserInfo("google-sub-legacy", VALID_EMAIL, "Test User");
+
+            when(accountRepository.findByGoogleSubject("google-sub-legacy"))
+                .thenReturn(Optional.of(legacyGoogleAccount));
+            when(accountRepository.findByEmail(VALID_EMAIL)).thenReturn(Optional.of(legacyGoogleAccount));
+            when(accountRepository.save(legacyGoogleAccount)).thenReturn(legacyGoogleAccount);
+            stubTokenPair(legacyGoogleAccount);
+
+            GoogleAuthenticationResult result = authService.authenticateWithGoogle(
+                googleUser,
+                GoogleOAuthMode.LOGIN
+            );
+
+            assertThat(result.passwordSetupRequired()).isFalse();
+            assertThat(legacyGoogleAccount.isPasswordSetupRequired()).isFalse();
+            verify(accountRepository).save(legacyGoogleAccount);
         }
 
         @Test

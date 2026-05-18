@@ -69,7 +69,8 @@ identity-service y catalog-service con una sola orquestación.
 - `MEDIA_GRPC_TIMEOUT_MS`: timeout de validacion gRPC contra Media.
 - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_FROM`, `EMAIL_SECURE`:
   SMTP para codigos de verificacion desde una cuenta tipo no-reply.
-- `EMAIL_SMTP_AUTH`, `EMAIL_STARTTLS_ENABLE`, `EMAIL_VERIFICATION_SUBJECT`: opciones SMTP y asunto del correo.
+- `EMAIL_SMTP_AUTH`, `EMAIL_STARTTLS_ENABLE`, `EMAIL_CONNECTION_TIMEOUT_MS`, `EMAIL_READ_TIMEOUT_MS`,
+  `EMAIL_WRITE_TIMEOUT_MS`, `EMAIL_VERIFICATION_SUBJECT`: opciones SMTP, timeouts y asunto del correo.
 - `REGISTRATION_VERIFICATION_CODE_TTL`: duracion del codigo de registro (`15m` por defecto).
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `FRONTEND_URL`:
   configuracion OAuth 2.0 de Google y retorno al frontend.

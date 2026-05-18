@@ -145,6 +145,7 @@ public class AuthServiceImpl implements AuthService {
             accountBySubject,
             equivalentAccounts
         );
+        account = allowGoogleSignInWithoutPasswordSetup(account);
 
         if (!account.isActive()) {
             throw new InvalidCredentialsException();
@@ -265,7 +266,7 @@ public class AuthServiceImpl implements AuthService {
             .googleSubject(googleUserInfo.subject())
             .role(Role.LISTENER)
             .isActive(true)
-            .passwordSetupRequired(true)
+            .passwordSetupRequired(false)
             .build();
 
         UserProfileEntity profile = UserProfileEntity.builder()
@@ -357,6 +358,15 @@ public class AuthServiceImpl implements AuthService {
         }
 
         return createGoogleAccount(googleUserInfo, normalizedEmail);
+    }
+
+    private UserAccountEntity allowGoogleSignInWithoutPasswordSetup(UserAccountEntity account) {
+        if (!account.isPasswordSetupRequired()) {
+            return account;
+        }
+
+        account.setPasswordSetupRequired(false);
+        return accountRepository.save(account);
     }
 
     private void detachGoogleSubject(UserAccountEntity account) {

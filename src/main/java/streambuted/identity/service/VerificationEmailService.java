@@ -1,10 +1,13 @@
 package streambuted.identity.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import streambuted.identity.config.EmailProperties;
+import streambuted.identity.exception.VerificationEmailDeliveryException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -12,6 +15,7 @@ import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class VerificationEmailService {
 
     private final JavaMailSender mailSender;
@@ -32,6 +36,11 @@ public class VerificationEmailService {
             Expira en: %s
             """.formatted(code, expiresInMinutes, expiresAt));
 
-        mailSender.send(message);
+        try {
+            mailSender.send(message);
+        } catch (MailException ex) {
+            log.warn("Failed to send registration verification email to {}: {}", email, ex.getMessage());
+            throw new VerificationEmailDeliveryException();
+        }
     }
 }

@@ -47,6 +47,9 @@ spring:
             enable: ${EMAIL_STARTTLS_ENABLE:false}
           ssl:
             enable: ${EMAIL_SECURE:false}
+          connectiontimeout: ${EMAIL_CONNECTION_TIMEOUT_MS:5000}
+          timeout: ${EMAIL_READ_TIMEOUT_MS:5000}
+          writetimeout: ${EMAIL_WRITE_TIMEOUT_MS:5000}
 
 app:
   email:
