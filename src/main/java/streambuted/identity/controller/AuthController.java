@@ -1,6 +1,7 @@
 package streambuted.identity.controller;
 
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import streambuted.identity.dto.*;
 import streambuted.identity.exception.IdentityException;
 import streambuted.identity.security.JwtProperties;
+import streambuted.identity.security.AuthRateLimiter;
 import streambuted.identity.security.RsaJwtKeyProvider;
 import streambuted.identity.service.AuthService;
 import streambuted.identity.service.oauth.GoogleOAuthMode;
@@ -39,15 +41,20 @@ public class AuthController {
     private static final String REFRESH_COOKIE_NAME = "refresh_token";
     private static final String GOOGLE_STATE_COOKIE_NAME = "google_oauth_state";
     private static final String GOOGLE_MODE_COOKIE_NAME = "google_oauth_mode";
+    private static final String GOOGLE_OAUTH_COOKIE_PATH = "/api/v1/auth";
 
     private final AuthService authService;
     private final JwtProperties jwtProperties;
     private final Environment environment;
     private final RsaJwtKeyProvider rsaJwtKeyProvider;
     private final GoogleOAuthService googleOAuthService;
+    private final AuthRateLimiter authRateLimiter;
 
-    @Value("${app.security.refresh-cookie.path:/api/v1/auth/refresh}")
+    @Value("${app.security.refresh-cookie.path:${REFRESH_COOKIE_PATH:/api/v1/auth/refresh}}")
     private String refreshCookiePath;
+
+    @Value("${app.security.refresh-cookie.secure:${REFRESH_COOKIE_SECURE:true}}")
+    private boolean refreshCookieSecure;
 
     /**
      * POST /api/v1/auth/register
@@ -55,8 +62,10 @@ public class AuthController {
      */
     @PostMapping("/register")
     public ResponseEntity<RegistrationVerificationResponse> register(
-        @Valid @RequestBody RegisterRequest request
+        @Valid @RequestBody RegisterRequest request,
+        HttpServletRequest servletRequest
     ) {
+        authRateLimiter.checkRegistration(servletRequest, request.email());
         log.debug("Registration attempt for email={}", request.email());
         RegistrationVerificationResponse response = authService.startRegistration(request);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
@@ -64,8 +73,10 @@ public class AuthController {
 
     @PostMapping("/register/resend")
     public ResponseEntity<RegistrationVerificationResponse> resendRegistrationCode(
-        @Valid @RequestBody ResendRegistrationCodeRequest request
+        @Valid @RequestBody ResendRegistrationCodeRequest request,
+        HttpServletRequest servletRequest
     ) {
+        authRateLimiter.checkVerification(servletRequest, request.attemptId(), request.email());
         RegistrationVerificationResponse response = authService.resendRegistrationCode(request);
         return ResponseEntity.ok(response);
     }
@@ -73,8 +84,10 @@ public class AuthController {
     @PostMapping("/register/verify")
     public ResponseEntity<LoginResponse> verifyRegistration(
         @Valid @RequestBody VerifyRegistrationRequest request,
+        HttpServletRequest servletRequest,
         HttpServletResponse servletResponse
     ) {
+        authRateLimiter.checkVerification(servletRequest, request.attemptId(), request.email());
         LoginResponse response = authService.verifyRegistration(request);
         attachRefreshTokenCookie(servletResponse, response.refreshToken());
         return ResponseEntity.status(HttpStatus.CREATED).body(hideRefreshToken(response));
@@ -82,8 +95,10 @@ public class AuthController {
 
     @PostMapping("/register/cancel")
     public ResponseEntity<Void> cancelRegistration(
-        @Valid @RequestBody CancelRegistrationVerificationRequest request
+        @Valid @RequestBody CancelRegistrationVerificationRequest request,
+        HttpServletRequest servletRequest
     ) {
+        authRateLimiter.checkVerification(servletRequest, request.attemptId(), request.email());
         authService.cancelRegistration(request);
         return ResponseEntity.noContent().build();
     }
@@ -96,8 +111,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
         @Valid @RequestBody LoginRequest request,
+        HttpServletRequest servletRequest,
         HttpServletResponse servletResponse
     ) {
+        authRateLimiter.checkLogin(servletRequest, request.email());
         log.debug("Login attempt for email={}", request.email());
         LoginResponse response = authService.login(request);
         attachRefreshTokenCookie(servletResponse, response.refreshToken());
@@ -143,9 +160,9 @@ public class AuthController {
 
             ResponseCookie stateCookie = ResponseCookie.from(GOOGLE_STATE_COOKIE_NAME, state)
                 .httpOnly(true)
-                .secure(isProductionProfile())
+                .secure(secureCookies())
                 .sameSite("Lax")
-                .path("/api/v1/auth/google/callback")
+                .path(GOOGLE_OAUTH_COOKIE_PATH)
                 .maxAge(Duration.ofMinutes(5))
                 .build();
 
@@ -154,9 +171,9 @@ public class AuthController {
                     oauthMode.name().toLowerCase()
                 )
                 .httpOnly(true)
-                .secure(isProductionProfile())
+                .secure(secureCookies())
                 .sameSite("Lax")
-                .path("/api/v1/auth/google/callback")
+                .path(GOOGLE_OAUTH_COOKIE_PATH)
                 .maxAge(Duration.ofMinutes(5))
                 .build();
 
@@ -171,7 +188,7 @@ public class AuthController {
         }
     }
 
-    @GetMapping("/google/callback")
+    @GetMapping({"/google/callback", "/oauth/google/callback"})
     public ResponseEntity<Void> googleCallback(
         @RequestParam(name = "code", required = false) String code,
         @RequestParam(name = "state", required = false) String state,
@@ -228,7 +245,7 @@ public class AuthController {
     private void attachRefreshTokenCookie(HttpServletResponse servletResponse, String refreshToken) {
         ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE_NAME, refreshToken)
             .httpOnly(true)
-            .secure(isProductionProfile())
+            .secure(secureCookies())
             .sameSite("Strict")
             .path(refreshCookiePath)
             .maxAge(Duration.ofMillis(jwtProperties.getRefreshTokenExpiryMs()))
@@ -240,7 +257,7 @@ public class AuthController {
     private void clearRefreshTokenCookie(HttpServletResponse servletResponse) {
         ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE_NAME, "")
             .httpOnly(true)
-            .secure(isProductionProfile())
+            .secure(secureCookies())
             .sameSite("Strict")
             .path(refreshCookiePath)
             .maxAge(Duration.ZERO)
@@ -252,9 +269,9 @@ public class AuthController {
     private void clearGoogleStateCookie(HttpServletResponse servletResponse) {
         ResponseCookie cookie = ResponseCookie.from(GOOGLE_STATE_COOKIE_NAME, "")
             .httpOnly(true)
-            .secure(isProductionProfile())
+            .secure(secureCookies())
             .sameSite("Lax")
-            .path("/api/v1/auth/google/callback")
+            .path(GOOGLE_OAUTH_COOKIE_PATH)
             .maxAge(Duration.ZERO)
             .build();
 
@@ -264,9 +281,9 @@ public class AuthController {
     private void clearGoogleModeCookie(HttpServletResponse servletResponse) {
         ResponseCookie cookie = ResponseCookie.from(GOOGLE_MODE_COOKIE_NAME, "")
             .httpOnly(true)
-            .secure(isProductionProfile())
+            .secure(secureCookies())
             .sameSite("Lax")
-            .path("/api/v1/auth/google/callback")
+            .path(GOOGLE_OAUTH_COOKIE_PATH)
             .maxAge(Duration.ZERO)
             .build();
 
@@ -290,5 +307,9 @@ public class AuthController {
 
     private boolean isProductionProfile() {
         return environment.acceptsProfiles(Profiles.of("prod"));
+    }
+
+    private boolean secureCookies() {
+        return refreshCookieSecure || isProductionProfile();
     }
 }

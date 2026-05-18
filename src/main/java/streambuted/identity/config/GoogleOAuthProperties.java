@@ -20,7 +20,7 @@ public class GoogleOAuthProperties {
 
     private String clientId = "";
     private String clientSecret = "";
-    private String callbackUrl = "http://localhost/api/v1/auth/google/callback";
+    private String callbackUrl = "http://localhost/api/v1/auth/oauth/google/callback";
     private String frontendUrl = "http://localhost:5173";
     private String authorizationUrl = "https://accounts.google.com/o/oauth2/v2/auth";
     private String tokenUrl = "https://oauth2.googleapis.com/token";

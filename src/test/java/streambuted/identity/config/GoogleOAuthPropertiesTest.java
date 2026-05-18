@@ -15,7 +15,7 @@ class GoogleOAuthPropertiesTest {
         MockEnvironment environment = new MockEnvironment()
             .withProperty("GOOGLE_CLIENT_ID", "client-id")
             .withProperty("GOOGLE_CLIENT_SECRET", "client-secret")
-            .withProperty("GOOGLE_CALLBACK_URL", "http://localhost/api/v1/auth/google/callback")
+            .withProperty("GOOGLE_CALLBACK_URL", "http://localhost/api/v1/auth/oauth/google/callback")
             .withProperty("FRONTEND_URL", "http://localhost:5173");
 
         GoogleOAuthProperties properties = new GoogleOAuthProperties(environment);
@@ -28,7 +28,7 @@ class GoogleOAuthPropertiesTest {
 
         assertThat(properties.getClientId()).isEqualTo("client-id");
         assertThat(properties.getClientSecret()).isEqualTo("client-secret");
-        assertThat(properties.getCallbackUrl()).isEqualTo("http://localhost/api/v1/auth/google/callback");
+        assertThat(properties.getCallbackUrl()).isEqualTo("http://localhost/api/v1/auth/oauth/google/callback");
         assertThat(properties.getFrontendUrl()).isEqualTo("http://localhost:5173");
     }
 

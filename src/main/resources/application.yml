@@ -54,11 +54,15 @@ app:
     verification-subject: ${EMAIL_VERIFICATION_SUBJECT:StreamButed verification code}
   registration:
     verification-code-ttl: ${REGISTRATION_VERIFICATION_CODE_TTL:15m}
+  security:
+    refresh-cookie:
+      path: ${REFRESH_COOKIE_PATH:/api/v1/auth/refresh}
+      secure: ${REFRESH_COOKIE_SECURE:true}
   google:
     oauth:
       client-id: ${GOOGLE_CLIENT_ID:}
       client-secret: ${GOOGLE_CLIENT_SECRET:}
-      callback-url: ${GOOGLE_CALLBACK_URL:http://localhost/api/v1/auth/google/callback}
+      callback-url: ${GOOGLE_CALLBACK_URL:http://localhost/api/v1/auth/oauth/google/callback}
       frontend-url: ${FRONTEND_URL:http://localhost:5173}
 
 # gRPC server
@@ -71,6 +75,7 @@ grpc:
 # JWT
 jwt:
   issuer: ${JWT_ISSUER:http://identity-service:8081}
+  audience: ${JWT_AUDIENCE:streambuted-api}
   key-id: ${JWT_KEY_ID:}
   rsa-private-key-pem: ${JWT_RSA_PRIVATE_KEY_PEM:}
   rsa-private-key-base64: ${JWT_RSA_PRIVATE_KEY_BASE64:}
@@ -110,5 +115,5 @@ management:
 logging:
   level:
     root: INFO
-    streambuted.identity: DEBUG
+    streambuted.identity: INFO
     org.springframework.security: WARN

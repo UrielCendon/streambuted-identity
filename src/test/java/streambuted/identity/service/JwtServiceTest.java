@@ -45,6 +45,7 @@ class JwtServiceTest {
     @BeforeEach
     void setUp() {
         when(jwtProperties.getIssuer()).thenReturn("http://identity-service-test");
+        when(jwtProperties.getAudience()).thenReturn("streambuted-api-test");
         when(jwtProperties.getAccessTokenExpiryMs()).thenReturn(ACCESS_EXPIRY_MS);
 
         RsaJwtKeyProvider rsaJwtKeyProvider = new RsaJwtKeyProvider(jwtProperties);
@@ -90,6 +91,7 @@ class JwtServiceTest {
             assertThat(claims).isPresent();
             assertThat(claims.get().get("email", String.class)).isEqualTo("user@example.com");
             assertThat(claims.get().get("role",  String.class)).isEqualTo("artist");
+            assertThat(claims.get().getAudience()).contains("streambuted-api-test");
         }
 
         @Test
@@ -153,6 +155,7 @@ class JwtServiceTest {
 
             JwtProperties otherProps = mock(JwtProperties.class);
             when(otherProps.getIssuer()).thenReturn("http://identity-service-test");
+            when(otherProps.getAudience()).thenReturn("streambuted-api-test");
             when(otherProps.getAccessTokenExpiryMs()).thenReturn(ACCESS_EXPIRY_MS);
 
             RsaJwtKeyProvider otherKeyProvider = new RsaJwtKeyProvider(otherProps);

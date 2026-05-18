@@ -19,6 +19,9 @@ public class JwtProperties {
     /** Token issuer (iss claim). Should be stable across environments. */
     private String issuer;
 
+    /** Token audience (aud claim). Required in production to avoid cross-service token confusion. */
+    private String audience;
+
     /** Optional RSA private key (PKCS#8) provided as PEM or base64-encoded DER. */
     private String rsaPrivateKeyPem;
     private String rsaPrivateKeyBase64;

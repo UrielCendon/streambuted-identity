@@ -1,10 +1,14 @@
 package streambuted.identity.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -13,12 +17,15 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import streambuted.identity.dto.ErrorResponse;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -36,6 +43,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ObjectMapper objectMapper;
 
     @Value("${cors.allowed-origins:http://localhost:5173}")
     private String allowedOriginsProperty;
@@ -46,6 +54,20 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(authenticationEntryPoint())
+                .accessDeniedHandler((request, response, accessDeniedException) ->
+                    writeJsonError(
+                        response,
+                        HttpStatus.FORBIDDEN,
+                        ErrorResponse.of(
+                            "AccessDeniedException",
+                            "You do not have permission to access this resource.",
+                            HttpStatus.FORBIDDEN.value()
+                        )
+                    )
+                )
+            )
             .authorizeHttpRequests(auth -> auth
                 // Public auth endpoints
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
@@ -57,6 +79,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/google").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/google/callback").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/google/callback").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/.well-known/jwks.json").permitAll()
                 // Actuator health is public for infrastructure checks.
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
@@ -66,6 +89,20 @@ public class SecurityConfig {
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public AuthenticationEntryPoint authenticationEntryPoint() {
+        return (request, response, authenticationException) ->
+            writeJsonError(
+                response,
+                HttpStatus.UNAUTHORIZED,
+                ErrorResponse.of(
+                    "AuthenticationException",
+                    "Missing or invalid Bearer token.",
+                    HttpStatus.UNAUTHORIZED.value()
+                )
+            );
     }
 
     /**
@@ -98,5 +135,15 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", corsConfiguration);
         return source;
+    }
+
+    private void writeJsonError(
+        HttpServletResponse response,
+        HttpStatus status,
+        ErrorResponse errorResponse
+    ) throws IOException {
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(), errorResponse);
     }
 }

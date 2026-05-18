@@ -62,6 +62,7 @@ class TokenValidatorGrpcServiceTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         when(jwtProperties.getIssuer()).thenReturn("http://identity-service-test");
+        when(jwtProperties.getAudience()).thenReturn("streambuted-api-test");
         when(jwtProperties.getAccessTokenExpiryMs()).thenReturn(ACCESS_EXPIRY_MS);
 
         jwtService = new JwtService(jwtProperties, new RsaJwtKeyProvider(jwtProperties));
@@ -188,6 +189,7 @@ class TokenValidatorGrpcServiceTest {
         void validate_expiredToken_returnsInvalid() {
             JwtProperties expiredProps = mock(JwtProperties.class);
             when(expiredProps.getIssuer()).thenReturn("http://identity-service-test");
+            when(expiredProps.getAudience()).thenReturn("streambuted-api-test");
             when(expiredProps.getAccessTokenExpiryMs()).thenReturn(-1L); // instantly expired
             JwtService expiredJwtService = new JwtService(expiredProps, new RsaJwtKeyProvider(expiredProps));
 

@@ -15,7 +15,11 @@ import streambuted.identity.service.oauth.GoogleOAuthMode;
 import streambuted.identity.service.oauth.GoogleUserInfo;
 
 import java.text.Normalizer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -49,6 +53,7 @@ public class AuthServiceImpl implements AuthService {
     private static final Pattern PASSWORD_UPPERCASE = Pattern.compile(".*[A-Z].*");
     private static final Pattern PASSWORD_DIGIT = Pattern.compile(".*\\d.*");
     private static final Pattern PASSWORD_SPECIAL = Pattern.compile(".*[^A-Za-z0-9].*");
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     // Registration
 
@@ -179,7 +184,7 @@ public class AuthServiceImpl implements AuthService {
             throw new InvalidRefreshTokenException();
         }
 
-        String tokenValue = refreshToken.trim();
+        String tokenValue = hashRefreshToken(refreshToken.trim());
         RefreshTokenEntity storedToken = refreshTokenRepository
             .findByTokenValue(tokenValue)
             .orElseThrow(InvalidRefreshTokenException::new);
@@ -203,7 +208,7 @@ public class AuthServiceImpl implements AuthService {
             return;
         }
 
-        String tokenValue = refreshToken.trim();
+        String tokenValue = hashRefreshToken(refreshToken.trim());
         long deletedRows = refreshTokenRepository.deleteByTokenValue(tokenValue);
         log.info("Logout completed. Invalidated refresh token rows={}", deletedRows);
     }
@@ -430,12 +435,13 @@ public class AuthServiceImpl implements AuthService {
      */
     private LoginResponse buildTokenPair(UserAccountEntity account) {
         String accessToken = jwtService.generateAccessToken(account);
-        String refreshValue = UUID.randomUUID().toString();
+        String refreshValue = generateRefreshToken();
+        String refreshHash = hashRefreshToken(refreshValue);
         Instant expiresAt = Instant.now().plusMillis(jwtProperties.getRefreshTokenExpiryMs());
 
         RefreshTokenEntity refreshToken = RefreshTokenEntity.builder()
             .account(account)
-            .tokenValue(refreshValue)
+            .tokenValue(refreshHash)
             .expiresAt(expiresAt)
             .isRevoked(false)
             .build();
@@ -448,5 +454,21 @@ public class AuthServiceImpl implements AuthService {
             account.getRole().name().toLowerCase(),
             jwtService.getAccessTokenExpirySeconds()
         );
+    }
+
+    private static String hashRefreshToken(String refreshToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (Exception ex) {
+            throw new IllegalStateException("SHA-256 is not available", ex);
+        }
+    }
+
+    private static String generateRefreshToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

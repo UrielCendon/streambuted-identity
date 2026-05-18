@@ -33,10 +33,7 @@ public class RefreshTokenEntity {
     @JoinColumn(name = "account_id", nullable = false, updatable = false)
     private UserAccountEntity account;
 
-    /**
-     * Opaque random value stored and compared in constant time.
-     * Never derived from JWT; it is a standalone credential.
-     */
+    /** SHA-256 hash of an opaque random refresh token. Raw token values are never persisted. */
     @Column(name = "token_value", nullable = false, unique = true, length = 512)
     private String tokenValue;
 
