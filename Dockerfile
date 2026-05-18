@@ -13,6 +13,10 @@ RUN mvn -B -DskipTests clean package
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-jammy
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system appgroup \
     && useradd --system --gid appgroup --create-home appuser
 
