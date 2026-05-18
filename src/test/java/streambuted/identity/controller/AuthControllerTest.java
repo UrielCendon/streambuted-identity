@@ -20,6 +20,7 @@ import streambuted.identity.dto.RegisterRequest;
 import streambuted.identity.dto.VerifyRegistrationRequest;
 import streambuted.identity.security.JwtProperties;
 import streambuted.identity.security.JwtService;
+import streambuted.identity.security.AuthRateLimiter;
 import streambuted.identity.security.RsaJwtKeyProvider;
 import streambuted.identity.service.AuthService;
 import streambuted.identity.service.oauth.GoogleOAuthService;
@@ -59,6 +60,9 @@ class AuthControllerTest {
 
     @MockBean
     private GoogleOAuthService googleOAuthService;
+
+    @MockBean
+    private AuthRateLimiter authRateLimiter;
 
     @BeforeEach
     void setUp() {

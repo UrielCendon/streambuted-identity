@@ -15,6 +15,9 @@ import streambuted.identity.service.oauth.GoogleOAuthMode;
 import streambuted.identity.service.oauth.GoogleUserInfo;
 
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -125,7 +128,7 @@ class AuthServiceImplTest {
 
             assertThatThrownBy(() -> authService.startRegistration(request))
                 .isInstanceOf(EmailAlreadyExistsException.class)
-                .hasMessageContaining(VALID_EMAIL);
+                .hasMessageContaining("Registration cannot be completed");
 
             verify(registrationVerificationService, never()).startRegistration(any(), any());
             verify(passwordEncoder, never()).encode(any());
@@ -511,7 +514,7 @@ class AuthServiceImplTest {
             return RefreshTokenEntity.builder()
                 .id(UUID.randomUUID())
                 .account(activeAccount)
-                .tokenValue(REFRESH_TOKEN)
+                .tokenValue(hashRefreshToken(REFRESH_TOKEN))
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .isRevoked(false)
                 .build();
@@ -521,7 +524,7 @@ class AuthServiceImplTest {
         @DisplayName("should rotate tokens and return new pair on success")
         void refresh_success_rotatesToken() {
             RefreshTokenEntity stored = validRefreshToken();
-            when(refreshTokenRepository.findByTokenValue(REFRESH_TOKEN)).thenReturn(Optional.of(stored));
+            when(refreshTokenRepository.findByTokenValue(hashRefreshToken(REFRESH_TOKEN))).thenReturn(Optional.of(stored));
             when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jwtService.generateAccessToken(activeAccount)).thenReturn(ACCESS_TOKEN);
             when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
@@ -540,7 +543,7 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("should throw InvalidRefreshTokenException when token does not exist")
         void refresh_unknownToken_throwsException() {
-            when(refreshTokenRepository.findByTokenValue("nonexistent-token"))
+            when(refreshTokenRepository.findByTokenValue(hashRefreshToken("nonexistent-token")))
                 .thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> authService.refresh("nonexistent-token"))
@@ -553,12 +556,12 @@ class AuthServiceImplTest {
             RefreshTokenEntity revoked = RefreshTokenEntity.builder()
                 .id(UUID.randomUUID())
                 .account(activeAccount)
-                .tokenValue(REFRESH_TOKEN)
+                .tokenValue(hashRefreshToken(REFRESH_TOKEN))
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .isRevoked(true)
                 .build();
 
-            when(refreshTokenRepository.findByTokenValue(REFRESH_TOKEN)).thenReturn(Optional.of(revoked));
+            when(refreshTokenRepository.findByTokenValue(hashRefreshToken(REFRESH_TOKEN))).thenReturn(Optional.of(revoked));
 
             assertThatThrownBy(() -> authService.refresh(REFRESH_TOKEN))
                 .isInstanceOf(InvalidRefreshTokenException.class);
@@ -572,12 +575,12 @@ class AuthServiceImplTest {
             RefreshTokenEntity expired = RefreshTokenEntity.builder()
                 .id(UUID.randomUUID())
                 .account(activeAccount)
-                .tokenValue(REFRESH_TOKEN)
+                .tokenValue(hashRefreshToken(REFRESH_TOKEN))
                 .expiresAt(Instant.now().minusSeconds(3600))
                 .isRevoked(false)
                 .build();
 
-            when(refreshTokenRepository.findByTokenValue(REFRESH_TOKEN)).thenReturn(Optional.of(expired));
+            when(refreshTokenRepository.findByTokenValue(hashRefreshToken(REFRESH_TOKEN))).thenReturn(Optional.of(expired));
 
             assertThatThrownBy(() -> authService.refresh(REFRESH_TOKEN))
                 .isInstanceOf(InvalidRefreshTokenException.class);
@@ -602,11 +605,11 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("should delete refresh token row when token is provided")
         void logout_deletesToken() {
-            when(refreshTokenRepository.deleteByTokenValue(REFRESH_TOKEN)).thenReturn(1L);
+            when(refreshTokenRepository.deleteByTokenValue(hashRefreshToken(REFRESH_TOKEN))).thenReturn(1L);
 
             authService.logout(REFRESH_TOKEN);
 
-            verify(refreshTokenRepository).deleteByTokenValue(REFRESH_TOKEN);
+            verify(refreshTokenRepository).deleteByTokenValue(hashRefreshToken(REFRESH_TOKEN));
         }
 
         @Test
@@ -624,5 +627,15 @@ class AuthServiceImplTest {
         when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
         when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(jwtService.getAccessTokenExpirySeconds()).thenReturn(EXPIRY_SECONDS);
+    }
+
+    private static String hashRefreshToken(String refreshToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 }

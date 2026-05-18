@@ -2,6 +2,7 @@ package streambuted.identity.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -52,6 +53,7 @@ public class JwtService {
             .header().keyId(rsaJwtKeyProvider.getKeyId()).and()
             .issuer(jwtProperties.getIssuer())
             .subject(account.getId().toString())
+            .audience().add(requiredAudience()).and()
             .id(UUID.randomUUID().toString())
             .claim(CLAIM_EMAIL, account.getEmail())
             .claim(CLAIM_ROLE, account.getRole().name().toLowerCase())
@@ -75,11 +77,16 @@ public class JwtService {
         try {
             Claims claims = Jwts.parser()
                 .verifyWith(rsaJwtKeyProvider.getPublicKey())
+                .requireIssuer(jwtProperties.getIssuer())
+                .requireAudience(requiredAudience())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
             return Optional.of(claims);
         } catch (ExpiredJwtException | UnsupportedJwtException | MalformedJwtException | SignatureException ex) {
+            log.debug("JWT validation failed: {}", ex.getMessage());
+            return Optional.empty();
+        } catch (JwtException | IllegalArgumentException ex) {
             log.debug("JWT validation failed: {}", ex.getMessage());
             return Optional.empty();
         }
@@ -104,5 +111,13 @@ public class JwtService {
     /** Access token lifetime in seconds, forwarded to the client as expiresIn. */
     public long getAccessTokenExpirySeconds() {
         return jwtProperties.getAccessTokenExpiryMs() / 1000;
+    }
+
+    private String requiredAudience() {
+        String audience = jwtProperties.getAudience();
+        if (audience == null || audience.isBlank()) {
+            throw new IllegalStateException("jwt.audience must be configured and non-empty.");
+        }
+        return audience.trim();
     }
 }
