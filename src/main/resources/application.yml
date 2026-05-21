@@ -67,6 +67,12 @@ app:
       client-secret: ${GOOGLE_CLIENT_SECRET:}
       callback-url: ${GOOGLE_CALLBACK_URL:http://localhost/api/v1/auth/oauth/google/callback}
       frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  admin:
+    bootstrap:
+      enabled: ${ADMIN_BOOTSTRAP_ENABLED:false}
+      email: ${ADMIN_BOOTSTRAP_EMAIL:}
+      username: ${ADMIN_BOOTSTRAP_USERNAME:}
+      password: ${ADMIN_BOOTSTRAP_PASSWORD:}
 
 # gRPC server
 grpc:
@@ -93,6 +99,7 @@ messaging:
     identity: identity.events
   routing-key:
     user-promoted: user.promoted
+    user-logged-in: user.logged-in
   queue:
     user-promoted: identity.user.promoted
 

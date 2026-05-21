@@ -1,5 +1,8 @@
 package streambuted.identity.service;
 
+import streambuted.identity.dto.AdminBanUserRequest;
+import streambuted.identity.dto.AdminUserListResponse;
+import streambuted.identity.dto.AdminUserResponse;
 import streambuted.identity.dto.UserProfileResponse;
 import streambuted.identity.dto.UpdateUserProfileRequest;
 
@@ -32,4 +35,19 @@ public interface UserService {
      * Throws RolePromotionException if the user is not a LISTENER.
      */
     UserProfileResponse promoteToArtist(UUID userId);
+
+    /**
+     * Returns all accounts for the administrator moderation console.
+     */
+    AdminUserListResponse listUsersForAdmin(int limit, int offset);
+
+    /**
+     * Applies a temporary or permanent ban and revokes active refresh tokens.
+     */
+    AdminUserResponse banUser(UUID adminUserId, UUID targetUserId, AdminBanUserRequest request);
+
+    /**
+     * Reactivates a banned account.
+     */
+    AdminUserResponse unbanUser(UUID adminUserId, UUID targetUserId);
 }

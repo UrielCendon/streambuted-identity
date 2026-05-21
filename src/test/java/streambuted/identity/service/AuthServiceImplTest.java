@@ -1,5 +1,6 @@
 package streambuted.identity.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -48,6 +49,8 @@ class AuthServiceImplTest {
     @Mock private JwtService             jwtService;
     @Mock private JwtProperties          jwtProperties;
     @Mock private RegistrationVerificationService registrationVerificationService;
+    @Mock private OutboxRepository outboxRepository;
+    @Spy private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -264,11 +267,43 @@ class AuthServiceImplTest {
 
             LoginRequest request = new LoginRequest(VALID_EMAIL, VALID_PASSWORD);
             when(accountRepository.findByEmail(VALID_EMAIL)).thenReturn(Optional.of(inactiveAccount));
+            when(passwordEncoder.matches(VALID_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
 
             assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-            verify(passwordEncoder, never()).matches(any(), any());
+            verify(jwtService, never()).generateAccessToken(any());
+        }
+
+        @Test
+        @DisplayName("should throw AccountBannedException when credentials are valid but account is banned")
+        void login_bannedAccount_throwsAccountBannedException() {
+            Instant bannedUntil = Instant.now().plusSeconds(3600);
+            UserAccountEntity bannedAccount = UserAccountEntity.builder()
+                .id(UUID.randomUUID())
+                .email(VALID_EMAIL)
+                .passwordHash(HASHED_PASSWORD)
+                .role(Role.LISTENER)
+                .isActive(false)
+                .bannedAt(Instant.now().minusSeconds(60))
+                .bannedUntil(bannedUntil)
+                .banReason("Moderation action")
+                .build();
+
+            LoginRequest request = new LoginRequest(VALID_EMAIL, VALID_PASSWORD);
+            when(accountRepository.findByEmail(VALID_EMAIL)).thenReturn(Optional.of(bannedAccount));
+            when(passwordEncoder.matches(VALID_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
+
+            assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AccountBannedException.class)
+                .satisfies(ex -> {
+                    AccountBannedException banned = (AccountBannedException) ex;
+                    assertThat(banned.getBanType()).isEqualTo("TEMPORARY");
+                    assertThat(banned.getBannedUntil()).isEqualTo(bannedUntil);
+                    assertThat(banned.getRemainingSeconds()).isPositive();
+                });
+
+            verify(jwtService, never()).generateAccessToken(any());
         }
 
         @Test

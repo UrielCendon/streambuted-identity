@@ -38,6 +38,9 @@ public class IdentityEventPublisher implements InitializingBean {
     @Value("${messaging.routing-key.user-promoted}")
     private String userPromotedRoutingKey;
 
+    @Value("${messaging.routing-key.user-logged-in}")
+    private String userLoggedInRoutingKey;
+
     @Value("${EVENT_SIGNING_SECRET:}")
     private String eventSigningSecret;
 
@@ -62,6 +65,37 @@ public class IdentityEventPublisher implements InitializingBean {
      * @param event the fully constructed event payload
      */
     public boolean publishUserPromoted(UserPromotedEvent event) {
+        return publishEvent(
+            event,
+            userPromotedRoutingKey,
+            "UserPromotedEvent",
+            event.userId(),
+            event.eventId()
+        );
+    }
+
+    /**
+     * Publishes a UserLoggedInEvent to the identity.events exchange.
+     *
+     * @param event the fully constructed event payload
+     */
+    public boolean publishUserLoggedIn(UserLoggedInEvent event) {
+        return publishEvent(
+            event,
+            userLoggedInRoutingKey,
+            "UserLoggedInEvent",
+            event.userId(),
+            event.eventId()
+        );
+    }
+
+    private boolean publishEvent(
+        Object event,
+        String routingKey,
+        String eventName,
+        Object userId,
+        Object eventId
+    ) {
         try {
             // Serialize the event to JSON to compute a stable HMAC signature
             String payloadJson = objectMapper.writeValueAsString(event);
@@ -76,18 +110,17 @@ public class IdentityEventPublisher implements InitializingBean {
                 .setHeader("X-Event-Signature", signature)
                 .build();
 
-            rabbitTemplate.send(identityExchange, userPromotedRoutingKey, message);
+            rabbitTemplate.send(identityExchange, routingKey, message);
 
-            log.info("Published UserPromotedEvent for userId={}, eventId={}",
-                event.userId(), event.eventId());
+            log.info("Published {} for userId={}, eventId={}", eventName, userId, eventId);
             return true;
         } catch (AmqpException ex) {
-            log.error("Failed to publish UserPromotedEvent for userId={}: {}",
-                event.userId(), ex.getMessage(), ex);
+            log.error("Failed to publish {} for userId={}: {}",
+                eventName, userId, ex.getMessage(), ex);
             return false;
         } catch (Exception ex) {
-            log.error("Failed to serialize/sign UserPromotedEvent for userId={}: {}",
-                event.userId(), ex.getMessage(), ex);
+            log.error("Failed to serialize/sign {} for userId={}: {}",
+                eventName, userId, ex.getMessage(), ex);
             return false;
         }
     }

@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import streambuted.identity.dto.AccountBannedErrorResponse;
 import streambuted.identity.dto.ErrorResponse;
 
 import java.util.stream.Collectors;
@@ -27,6 +28,18 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     // Domain exceptions.
+
+    @ExceptionHandler(AccountBannedException.class)
+    public ResponseEntity<AccountBannedErrorResponse> handleAccountBanned(AccountBannedException ex) {
+        log.warn("Banned account authentication attempt: {}", ex.getMessage());
+        AccountBannedErrorResponse body = AccountBannedErrorResponse.of(
+            ex.getMessage(),
+            ex.getBanType(),
+            ex.getBannedUntil(),
+            ex.getRemainingSeconds()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
 
     @ExceptionHandler(IdentityException.class)
     public ResponseEntity<ErrorResponse> handleIdentityException(IdentityException ex) {

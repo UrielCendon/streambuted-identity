@@ -1,5 +1,7 @@
 package streambuted.identity.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -11,6 +13,7 @@ import streambuted.identity.exception.*;
 import streambuted.identity.repository.*;
 import streambuted.identity.security.JwtProperties;
 import streambuted.identity.security.JwtService;
+import streambuted.identity.messaging.UserLoggedInEvent;
 import streambuted.identity.service.oauth.GoogleOAuthMode;
 import streambuted.identity.service.oauth.GoogleUserInfo;
 
@@ -48,6 +51,8 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService             jwtService;
     private final JwtProperties          jwtProperties;
     private final RegistrationVerificationService registrationVerificationService;
+    private final OutboxRepository outboxRepository;
+    private final ObjectMapper objectMapper;
 
     private static final Pattern NON_USERNAME_CHARS = Pattern.compile("[^a-z0-9._-]");
     private static final Pattern PASSWORD_UPPERCASE = Pattern.compile(".*[A-Z].*");
@@ -99,7 +104,9 @@ public class AuthServiceImpl implements AuthService {
         accountRepository.save(account);
         log.info("Verified registration for email={}, id={}", account.getEmail(), account.getId());
 
-        return buildTokenPair(account);
+        LoginResponse response = buildTokenPair(account);
+        enqueueUserLoggedInEvent(account.getId());
+        return response;
     }
 
     @Override
@@ -115,16 +122,16 @@ public class AuthServiceImpl implements AuthService {
         UserAccountEntity account = resolvePrimaryAccountByEmail(normalizedEmail)
             .orElseThrow(InvalidCredentialsException::new);
 
-        if (!account.isActive()) {
-            throw new InvalidCredentialsException();
-        }
-
         if (!passwordEncoder.matches(request.password(), account.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
 
+        ensureAccountCanAuthenticate(account);
+
         log.info("Successful login for userId={}", account.getId());
-        return buildTokenPair(account);
+        LoginResponse response = buildTokenPair(account);
+        enqueueUserLoggedInEvent(account.getId());
+        return response;
     }
 
     @Override
@@ -147,15 +154,12 @@ public class AuthServiceImpl implements AuthService {
         );
         account = allowGoogleSignInWithoutPasswordSetup(account);
 
-        if (!account.isActive()) {
-            throw new InvalidCredentialsException();
-        }
+        ensureAccountCanAuthenticate(account);
 
         log.info("Successful Google auth for userId={}", account.getId());
-        return new GoogleAuthenticationResult(
-            buildTokenPair(account),
-            account.isPasswordSetupRequired()
-        );
+        LoginResponse response = buildTokenPair(account);
+        enqueueUserLoggedInEvent(account.getId());
+        return new GoogleAuthenticationResult(response, account.isPasswordSetupRequired());
     }
 
     @Override
@@ -194,11 +198,13 @@ public class AuthServiceImpl implements AuthService {
             throw new InvalidRefreshTokenException();
         }
 
+        UserAccountEntity account = storedToken.getAccount();
+        ensureAccountCanAuthenticate(account);
+
         // Revoke the used token to prevent replay attacks.
         storedToken.setRevoked(true);
         refreshTokenRepository.save(storedToken);
 
-        UserAccountEntity account = storedToken.getAccount();
         log.info("Refresh token rotated for userId={}", account.getId());
         return buildTokenPair(account);
     }
@@ -238,6 +244,28 @@ public class AuthServiceImpl implements AuthService {
         if (profileRepository.existsByUsername(username)) {
             throw new UsernameAlreadyExistsException(username);
         }
+    }
+
+    private void ensureAccountCanAuthenticate(UserAccountEntity account) {
+        if (account.isActive()) {
+            return;
+        }
+
+        Instant bannedUntil = account.getBannedUntil();
+        if (bannedUntil != null && !Instant.now().isBefore(bannedUntil)) {
+            account.setActive(true);
+            account.setBannedAt(null);
+            account.setBannedUntil(null);
+            account.setBanReason(null);
+            accountRepository.save(account);
+            return;
+        }
+
+        if (account.getBannedAt() != null) {
+            throw new AccountBannedException(bannedUntil, account.getBanReason());
+        }
+
+        throw new InvalidCredentialsException();
     }
 
     private UserAccountEntity linkGoogleSubject(
@@ -480,5 +508,31 @@ public class AuthServiceImpl implements AuthService {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private void enqueueUserLoggedInEvent(UUID userId) {
+        if (userId == null) {
+            log.warn("Skipping USER_LOGGED_IN outbox event because account id is not available yet.");
+            return;
+        }
+
+        UserLoggedInEvent event = UserLoggedInEvent.of(userId);
+        OutboxEntity outboxEvent = OutboxEntity.builder()
+            .aggregateId(userId)
+            .eventType("USER_LOGGED_IN")
+            .payload(createPayload(event))
+            .status(OutboxStatus.PENDING)
+            .retryCount(0)
+            .build();
+
+        outboxRepository.save(outboxEvent);
+    }
+
+    private JsonNode createPayload(Object event) {
+        try {
+            return objectMapper.valueToTree(event);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalStateException("Failed to serialize outbox event", ex);
+        }
     }
 }

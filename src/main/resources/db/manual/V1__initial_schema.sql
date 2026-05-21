@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS user_account (
   role varchar(20) NOT NULL,
   is_active boolean NOT NULL,
   password_setup_required boolean NOT NULL,
+  banned_at timestamp with time zone,
+  banned_until timestamp with time zone,
+  ban_reason varchar(500),
   created_at timestamp with time zone NOT NULL,
   updated_at timestamp with time zone NOT NULL
 );
@@ -34,6 +37,7 @@ CREATE TABLE IF NOT EXISTS refresh_token (
 
 CREATE INDEX IF NOT EXISTS idx_refresh_token_value ON refresh_token(token_value);
 CREATE INDEX IF NOT EXISTS idx_refresh_token_account ON refresh_token(account_id);
+CREATE INDEX IF NOT EXISTS idx_user_account_banned_until ON user_account(banned_until);
 
 CREATE TABLE IF NOT EXISTS registration_verification (
   id uuid PRIMARY KEY,

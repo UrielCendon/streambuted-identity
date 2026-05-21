@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import streambuted.identity.domain.OutboxEntity;
 import streambuted.identity.domain.OutboxStatus;
 import streambuted.identity.messaging.IdentityEventPublisher;
+import streambuted.identity.messaging.UserLoggedInEvent;
 import streambuted.identity.messaging.UserPromotedEvent;
 import streambuted.identity.repository.OutboxRepository;
 
@@ -75,9 +76,7 @@ public class OutboxProcessor {
 
     private void processSingleEvent(OutboxEntity outboxEvent) {
         try {
-            UserPromotedEvent event = objectMapper.treeToValue(outboxEvent.getPayload(), UserPromotedEvent.class);
-
-            boolean published = eventPublisher.publishUserPromoted(event);
+            boolean published = publishOutboxEvent(outboxEvent);
             if (published) {
                 markProcessed(outboxEvent);
             } else {
@@ -88,6 +87,27 @@ public class OutboxProcessor {
         } catch (DataAccessException ex) {
             log.error("Failed to update outbox row id={}: {}", outboxEvent.getId(), ex.getMessage(), ex);
         }
+    }
+
+    private boolean publishOutboxEvent(OutboxEntity outboxEvent) throws JsonProcessingException {
+        return switch (outboxEvent.getEventType()) {
+            case "USER_PROMOTED" -> {
+                UserPromotedEvent event = objectMapper.treeToValue(outboxEvent.getPayload(), UserPromotedEvent.class);
+                yield eventPublisher.publishUserPromoted(event);
+            }
+            case "USER_LOGGED_IN" -> {
+                UserLoggedInEvent event = objectMapper.treeToValue(outboxEvent.getPayload(), UserLoggedInEvent.class);
+                yield eventPublisher.publishUserLoggedIn(event);
+            }
+            default -> {
+                log.warn(
+                    "Unsupported outbox event type id={} eventType={}",
+                    outboxEvent.getId(),
+                    outboxEvent.getEventType()
+                );
+                yield false;
+            }
+        };
     }
 
     private void markProcessed(OutboxEntity outboxEvent) {
