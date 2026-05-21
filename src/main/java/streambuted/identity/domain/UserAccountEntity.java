@@ -56,6 +56,15 @@ public class UserAccountEntity {
     @Builder.Default
     private boolean passwordSetupRequired = false;
 
+    @Column(name = "banned_at")
+    private Instant bannedAt;
+
+    @Column(name = "banned_until")
+    private Instant bannedUntil;
+
+    @Column(name = "ban_reason", length = 500)
+    private String banReason;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

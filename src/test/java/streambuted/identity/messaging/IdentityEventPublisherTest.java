@@ -34,6 +34,7 @@ class IdentityEventPublisherTest {
 
         ReflectionTestUtils.setField(publisher, "identityExchange", "identity.events");
         ReflectionTestUtils.setField(publisher, "userPromotedRoutingKey", "user.promoted");
+        ReflectionTestUtils.setField(publisher, "userLoggedInRoutingKey", "user.logged-in");
         ReflectionTestUtils.setField(publisher, "eventSigningSecret", signingSecret);
         publisher.afterPropertiesSet();
 

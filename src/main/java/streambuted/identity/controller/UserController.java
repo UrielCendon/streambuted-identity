@@ -1,5 +1,6 @@
 package streambuted.identity.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -7,6 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import streambuted.identity.dto.AdminBanUserRequest;
+import streambuted.identity.dto.AdminUserListResponse;
+import streambuted.identity.dto.AdminUserResponse;
 import streambuted.identity.dto.UpdateUserProfileRequest;
 import streambuted.identity.dto.UserProfileResponse;
 import streambuted.identity.service.UserService;
@@ -67,5 +71,33 @@ public class UserController {
         log.info("Promotion request received for userId={}", userId);
         UserProfileResponse response = userService.promoteToArtist(userId);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminUserListResponse> listUsersForAdmin(
+        @RequestParam(name = "limit", defaultValue = "50") int limit,
+        @RequestParam(name = "offset", defaultValue = "0") int offset
+    ) {
+        return ResponseEntity.ok(userService.listUsersForAdmin(limit, offset));
+    }
+
+    @PatchMapping("/admin/{targetUserId}/ban")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminUserResponse> banUser(
+        @AuthenticationPrincipal UUID adminUserId,
+        @PathVariable UUID targetUserId,
+        @Valid @RequestBody AdminBanUserRequest request
+    ) {
+        return ResponseEntity.ok(userService.banUser(adminUserId, targetUserId, request));
+    }
+
+    @PatchMapping("/admin/{targetUserId}/unban")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminUserResponse> unbanUser(
+        @AuthenticationPrincipal UUID adminUserId,
+        @PathVariable UUID targetUserId
+    ) {
+        return ResponseEntity.ok(userService.unbanUser(adminUserId, targetUserId));
     }
 }

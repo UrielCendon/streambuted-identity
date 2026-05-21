@@ -28,6 +28,7 @@ messaging:
     identity: identity.events
   routing-key:
     user-promoted: user.promoted
+    user-logged-in: user.logged-in
   queue:
     user-promoted: identity.user.promoted
 

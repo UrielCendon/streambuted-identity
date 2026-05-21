@@ -49,6 +49,7 @@ public interface AuthService {
     /**
      * Authenticates a user and issues a JWT + refresh token pair.
      * Throws InvalidCredentialsException on bad credentials or inactive account.
+     * Throws AccountBannedException when credentials are valid but the account is banned.
      */
     LoginResponse login(LoginRequest request);
 

@@ -1,6 +1,10 @@
 package streambuted.identity.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import streambuted.identity.domain.UserAccountEntity;
 
@@ -21,4 +25,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccountEntity, 
     boolean existsByEmail(String email);
 
     List<UserAccountEntity> findAllByEmailEndingWithIgnoreCase(String suffix);
+
+    @EntityGraph(attributePaths = "profile")
+    @Query("SELECT account FROM UserAccountEntity account ORDER BY account.createdAt DESC")
+    Page<UserAccountEntity> findAllForAdmin(Pageable pageable);
 }
