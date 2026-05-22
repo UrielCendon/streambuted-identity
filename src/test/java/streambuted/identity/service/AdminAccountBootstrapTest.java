@@ -68,6 +68,7 @@ class AdminAccountBootstrapTest {
         when(accountRepository.findByEmail("admin@streambuted.com")).thenReturn(Optional.of(account));
         when(profileRepository.findByAccountId(account.getId())).thenReturn(Optional.empty());
         when(profileRepository.existsByUsername("admin_user")).thenReturn(false);
+        when(passwordEncoder.matches("SecureAdmin1!", "$2a$12$hash")).thenReturn(true);
 
         bootstrap.provisionAdminAccount();
 
@@ -76,6 +77,30 @@ class AdminAccountBootstrapTest {
         assertThat(account.isPasswordSetupRequired()).isFalse();
         verify(accountRepository).save(account);
         verify(profileRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("should update password hash for an existing admin when bootstrap password changes")
+    void provisionAdminAccount_updatesExistingPasswordHash() {
+        UserAccountEntity account = UserAccountEntity.builder()
+            .id(UUID.randomUUID())
+            .email("admin@streambuted.com")
+            .passwordHash("$2a$12$oldhash")
+            .role(Role.ADMIN)
+            .isActive(true)
+            .passwordSetupRequired(false)
+            .build();
+        AdminAccountBootstrap bootstrap = buildBootstrap(true, "admin@streambuted.com", "admin_user", "SecureAdmin1!");
+
+        when(accountRepository.findByEmail("admin@streambuted.com")).thenReturn(Optional.of(account));
+        when(profileRepository.findByAccountId(account.getId())).thenReturn(Optional.ofNullable(account.getProfile()));
+        when(passwordEncoder.matches("SecureAdmin1!", "$2a$12$oldhash")).thenReturn(false);
+        when(passwordEncoder.encode("SecureAdmin1!")).thenReturn("$2a$12$newhash");
+
+        bootstrap.provisionAdminAccount();
+
+        assertThat(account.getPasswordHash()).isEqualTo("$2a$12$newhash");
+        verify(accountRepository).save(account);
     }
 
     @Test
@@ -97,6 +122,26 @@ class AdminAccountBootstrapTest {
         assertThatThrownBy(bootstrap::provisionAdminAccount)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("ADMIN_BOOTSTRAP_PASSWORD");
+    }
+
+    @Test
+    @DisplayName("should fail fast when bootstrap password has leading or trailing spaces")
+    void provisionAdminAccount_passwordWithOuterSpacesThrows() {
+        AdminAccountBootstrap bootstrap = buildBootstrap(true, "admin@streambuted.com", "admin_user", "SecureAdmin1! ");
+
+        assertThatThrownBy(bootstrap::provisionAdminAccount)
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("leading or trailing spaces");
+    }
+
+    @Test
+    @DisplayName("should fail fast when bootstrap password exceeds the shared 15 character limit")
+    void provisionAdminAccount_passwordTooLongThrows() {
+        AdminAccountBootstrap bootstrap = buildBootstrap(true, "admin@streambuted.com", "admin_user", "R7!mV4xqA2pZ9sL0");
+
+        assertThatThrownBy(bootstrap::provisionAdminAccount)
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("between 8 and 15 characters");
     }
 
     private AdminAccountBootstrap buildBootstrap(

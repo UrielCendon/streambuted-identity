@@ -65,4 +65,9 @@ public interface AuthService {
      * This is idempotent to avoid leaking token existence.
      */
     void logout(String refreshToken);
+
+    /**
+     * Validates an access token against the current account state.
+     */
+    ValidatedTokenResponse validateAccessToken(String token);
 }

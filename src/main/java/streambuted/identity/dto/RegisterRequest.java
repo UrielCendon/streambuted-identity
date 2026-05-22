@@ -20,6 +20,6 @@ public record RegisterRequest(
     String username,
 
     @NotBlank(message = "Password must not be blank")
-    @Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters")
+    @Size(min = 8, max = 15, message = "Password must be between 8 and 15 characters")
     String password
 ) {}

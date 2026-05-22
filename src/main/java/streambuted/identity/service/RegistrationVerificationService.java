@@ -85,7 +85,7 @@ public class RegistrationVerificationService {
         }
 
         if (!passwordEncoder.matches(request.code(), attempt.getCodeHash())) {
-            throw new InvalidRegistrationVerificationException("Verification code is incorrect.");
+            throw new InvalidRegistrationVerificationException("El código de verificación es incorrecto.");
         }
 
         attempt.setStatus(RegistrationVerificationStatus.VERIFIED);
@@ -128,7 +128,7 @@ public class RegistrationVerificationService {
         return verificationRepository
             .findByIdAndEmail(attemptId, normalizeEmail(email))
             .orElseThrow(() -> new InvalidRegistrationVerificationException(
-                "Verification attempt was not found."
+                "El intento de verificación no fue encontrado."
             ));
     }
 
@@ -156,7 +156,7 @@ public class RegistrationVerificationService {
         }
 
         throw new InvalidRegistrationVerificationException(
-            "Verification code is no longer valid. Request a new code."
+            "El código de verificación ya no es válido. Solicita un nuevo código."
         );
     }
 

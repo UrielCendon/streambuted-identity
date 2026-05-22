@@ -38,10 +38,10 @@ public class AccountBannedException extends IdentityException {
 
     private static String buildMessage(Instant bannedUntil) {
         if (bannedUntil == null) {
-            return "La cuenta se encuentra baneada permanentemente.";
+            return "La cuenta se encuentra suspendida permanentemente.";
         }
 
-        return "La cuenta se encuentra baneada. Se reactivara en "
+        return "La cuenta se encuentra suspendida. Se reactivara en "
             + formatRemainingTime(remainingSecondsUntil(bannedUntil))
             + ".";
     }

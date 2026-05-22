@@ -17,6 +17,7 @@ import streambuted.identity.dto.LoginRequest;
 import streambuted.identity.dto.LoginResponse;
 import streambuted.identity.dto.RegistrationVerificationResponse;
 import streambuted.identity.dto.RegisterRequest;
+import streambuted.identity.dto.ValidatedTokenResponse;
 import streambuted.identity.dto.VerifyRegistrationRequest;
 import streambuted.identity.security.JwtProperties;
 import streambuted.identity.security.JwtService;
@@ -30,6 +31,7 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -190,5 +192,27 @@ class AuthControllerTest {
             .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Strict")));
 
         verify(authService).logout("refresh-token-value");
+    }
+
+    @Test
+    @DisplayName("validate should delegate bearer token validation and return account state")
+    void validate_delegatesBearerTokenValidation() throws Exception {
+        when(authService.validateAccessToken("access-token-value")).thenReturn(
+            new ValidatedTokenResponse(
+                UUID.randomUUID().toString(),
+                "listener",
+                "listener@streambuted.com",
+                true
+            )
+        );
+
+        mockMvc.perform(get("/api/v1/auth/validate")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer access-token-value"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.role").value("listener"))
+            .andExpect(jsonPath("$.email").value("listener@streambuted.com"))
+            .andExpect(jsonPath("$.isActive").value(true));
+
+        verify(authService).validateAccessToken("access-token-value");
     }
 }

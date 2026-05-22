@@ -19,6 +19,7 @@ import streambuted.identity.dto.AdminUserResponse;
 import streambuted.identity.dto.PaginationResponse;
 import streambuted.identity.dto.UpdateUserProfileRequest;
 import streambuted.identity.dto.UserProfileResponse;
+import streambuted.identity.exception.AccountBannedException;
 import streambuted.identity.exception.AdminModerationException;
 import streambuted.identity.exception.ProfileUpdateException;
 import streambuted.identity.exception.RolePromotionException;
@@ -57,10 +58,10 @@ public class UserServiceImpl implements UserService {
     private final MediaAssetClient mediaAssetClient;
 
     @Override
-    @Transactional(readOnly = true)
     public UserProfileResponse getProfile(UUID userId) {
         UserAccountEntity account = accountRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException(userId.toString()));
+        ensureAccountCanAccessProtectedEndpoints(account);
 
         UserProfileEntity profile = profileRepository.findByAccountId(userId)
             .orElseThrow(() -> new UserNotFoundException(userId.toString()));
@@ -76,6 +77,7 @@ public class UserServiceImpl implements UserService {
     ) {
         UserAccountEntity account = accountRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException(userId.toString()));
+        ensureAccountCanAccessProtectedEndpoints(account);
 
         UserProfileEntity profile = profileRepository.findByAccountId(userId)
             .orElseThrow(() -> new UserNotFoundException(userId.toString()));
@@ -92,6 +94,7 @@ public class UserServiceImpl implements UserService {
     public UserProfileResponse promoteToArtist(UUID userId) {
         UserAccountEntity account = accountRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException(userId.toString()));
+        ensureAccountCanAccessProtectedEndpoints(account);
 
         if (account.getRole() != Role.LISTENER) {
             throw new RolePromotionException(
@@ -374,6 +377,26 @@ public class UserServiceImpl implements UserService {
         }
 
         return Instant.now().isAfter(bannedUntil) ? "EXPIRED" : "TEMPORARY";
+    }
+
+    private void ensureAccountCanAccessProtectedEndpoints(UserAccountEntity account) {
+        if (account.isActive()) {
+            return;
+        }
+
+        Instant bannedUntil = account.getBannedUntil();
+        if (bannedUntil != null && !Instant.now().isBefore(bannedUntil)) {
+            account.setActive(true);
+            account.setBannedAt(null);
+            account.setBannedUntil(null);
+            account.setBanReason(null);
+            accountRepository.save(account);
+            return;
+        }
+
+        if (account.getBannedAt() != null) {
+            throw new AccountBannedException(bannedUntil, account.getBanReason());
+        }
     }
 
     private JsonNode createPayload(UserPromotedEvent event) {

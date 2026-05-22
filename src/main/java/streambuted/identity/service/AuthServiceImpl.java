@@ -2,6 +2,7 @@ package streambuted.identity.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -55,6 +56,8 @@ public class AuthServiceImpl implements AuthService {
     private final ObjectMapper objectMapper;
 
     private static final Pattern NON_USERNAME_CHARS = Pattern.compile("[^a-z0-9._-]");
+    private static final int PASSWORD_MIN_LENGTH = 8;
+    private static final int PASSWORD_MAX_LENGTH = 15;
     private static final Pattern PASSWORD_UPPERCASE = Pattern.compile(".*[A-Z].*");
     private static final Pattern PASSWORD_DIGIT = Pattern.compile(".*\\d.*");
     private static final Pattern PASSWORD_SPECIAL = Pattern.compile(".*[^A-Za-z0-9].*");
@@ -220,6 +223,26 @@ public class AuthServiceImpl implements AuthService {
         log.info("Logout completed. Invalidated refresh token rows={}", deletedRows);
     }
 
+    @Override
+    public ValidatedTokenResponse validateAccessToken(String token) {
+        UUID userId = jwtService.extractClaims(token)
+            .map(Claims::getSubject)
+            .map(UUID::fromString)
+            .orElseThrow(InvalidAccessTokenException::new);
+
+        UserAccountEntity account = accountRepository.findById(userId)
+            .orElseThrow(InvalidAccessTokenException::new);
+
+        ensureAccountCanAuthenticate(account);
+
+        return new ValidatedTokenResponse(
+            account.getId().toString(),
+            account.getRole().name().toLowerCase(),
+            account.getEmail(),
+            account.isActive()
+        );
+    }
+
     // Private helpers
 
     private RegisterRequest normalizeRegisterRequest(RegisterRequest request) {
@@ -343,6 +366,10 @@ public class AuthServiceImpl implements AuthService {
     private void validatePasswordPolicy(String password) {
         if (password == null || password.isBlank()) {
             throw new PasswordPolicyException("Password must not be blank.");
+        }
+
+        if (password.length() < PASSWORD_MIN_LENGTH || password.length() > PASSWORD_MAX_LENGTH) {
+            throw new PasswordPolicyException("Password must be between 8 and 15 characters.");
         }
 
         if (!PASSWORD_UPPERCASE.matcher(password).matches()) {

@@ -263,7 +263,7 @@ es `PROFILE_IMAGE` y pertenece al usuario autenticado. Enviar
 ```json
 {
   "error": "InvalidCredentialsException",
-  "message": "Invalid email or password",
+  "message": "El correo o la contraseña son incorrectos.",
   "statusCode": 401,
   "timestamp": "2024-01-15T10:30:00Z"
 }

@@ -16,6 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import streambuted.identity.dto.*;
 import streambuted.identity.exception.IdentityException;
+import streambuted.identity.exception.InvalidAccessTokenException;
 import streambuted.identity.security.JwtProperties;
 import streambuted.identity.security.AuthRateLimiter;
 import streambuted.identity.security.RsaJwtKeyProvider;
@@ -149,6 +150,13 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/validate")
+    public ResponseEntity<ValidatedTokenResponse> validateAccessToken(
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader
+    ) {
+        return ResponseEntity.ok(authService.validateAccessToken(extractBearerToken(authorizationHeader)));
+    }
+
     @GetMapping("/google")
     public ResponseEntity<Void> startGoogleOAuth(
         @RequestParam(name = "mode", required = false, defaultValue = "login") String mode
@@ -264,6 +272,19 @@ public class AuthController {
             .build();
 
         servletResponse.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || authorizationHeader.isBlank()) {
+            throw new InvalidAccessTokenException();
+        }
+
+        String[] parts = authorizationHeader.trim().split("\\s+");
+        if (parts.length != 2 || !"bearer".equalsIgnoreCase(parts[0]) || parts[1].isBlank()) {
+            throw new InvalidAccessTokenException();
+        }
+
+        return parts[1];
     }
 
     private void clearGoogleStateCookie(HttpServletResponse servletResponse) {

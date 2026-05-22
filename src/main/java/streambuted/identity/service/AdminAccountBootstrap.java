@@ -28,6 +28,8 @@ import java.util.regex.Pattern;
 @Slf4j
 public class AdminAccountBootstrap {
 
+    private static final int PASSWORD_MIN_LENGTH = 8;
+    private static final int PASSWORD_MAX_LENGTH = 15;
     private static final Pattern PASSWORD_UPPERCASE = Pattern.compile(".*[A-Z].*");
     private static final Pattern PASSWORD_DIGIT = Pattern.compile(".*\\d.*");
     private static final Pattern PASSWORD_SPECIAL = Pattern.compile(".*[^A-Za-z0-9].*");
@@ -102,6 +104,11 @@ public class AdminAccountBootstrap {
             changed = true;
         }
 
+        if (!passwordEncoder.matches(configuredPassword, account.getPasswordHash())) {
+            account.setPasswordHash(passwordEncoder.encode(configuredPassword));
+            changed = true;
+        }
+
         if (account.getBannedAt() != null || account.getBannedUntil() != null || account.getBanReason() != null) {
             account.setBannedAt(null);
             account.setBannedUntil(null);
@@ -164,8 +171,12 @@ public class AdminAccountBootstrap {
             throw new IllegalStateException("ADMIN_BOOTSTRAP_USERNAME must be between 3 and 50 characters.");
         }
 
-        if (password.length() < 8 || password.length() > 128) {
-            throw new IllegalStateException("ADMIN_BOOTSTRAP_PASSWORD must be between 8 and 128 characters.");
+        if (!password.equals(password.trim())) {
+            throw new IllegalStateException("ADMIN_BOOTSTRAP_PASSWORD must not include leading or trailing spaces.");
+        }
+
+        if (password.length() < PASSWORD_MIN_LENGTH || password.length() > PASSWORD_MAX_LENGTH) {
+            throw new IllegalStateException("ADMIN_BOOTSTRAP_PASSWORD must be between 8 and 15 characters.");
         }
 
         if (!PASSWORD_UPPERCASE.matcher(password).matches()

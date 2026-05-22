@@ -182,7 +182,7 @@ class AuthServiceImplTest {
                 "000000"
             );
             when(registrationVerificationService.verifyCode(request))
-                .thenThrow(new InvalidRegistrationVerificationException("Verification code is incorrect."));
+                .thenThrow(new InvalidRegistrationVerificationException("El código de verificación es incorrecto."));
 
             assertThatThrownBy(() -> authService.verifyRegistration(request))
                 .isInstanceOf(InvalidRegistrationVerificationException.class);
@@ -335,6 +335,16 @@ class AuthServiceImplTest {
             assertThatThrownBy(() -> authService.startRegistration(request))
                 .isInstanceOf(PasswordPolicyException.class)
                 .hasMessageContaining("uppercase");
+        }
+
+        @Test
+        @DisplayName("should reject passwords longer than 15 characters during email registration")
+        void startRegistration_passwordTooLong_throwsException() {
+            RegisterRequest request = new RegisterRequest(VALID_EMAIL, VALID_USERNAME, "SecurePass12345!");
+
+            assertThatThrownBy(() -> authService.startRegistration(request))
+                .isInstanceOf(PasswordPolicyException.class)
+                .hasMessageContaining("between 8 and 15 characters");
         }
 
         @Test
