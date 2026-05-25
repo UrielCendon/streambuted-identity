@@ -34,7 +34,7 @@ public class UserProfileEntity {
     @JoinColumn(name = "account_id", nullable = false, unique = true, updatable = false)
     private UserAccountEntity account;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 100)
     private String username;
 
     @Column(columnDefinition = "TEXT")

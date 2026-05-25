@@ -263,6 +263,42 @@ class UserServiceImplTest {
 
             verify(profileRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("should accept usernames up to 100 characters")
+        void updateProfile_usernameWithOneHundredCharacters_succeeds() {
+            String username = "a".repeat(100);
+            UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+            request.setUsername(username);
+
+            stubAccountAndProfile();
+            when(profileRepository.existsByUsername(username)).thenReturn(false);
+
+            UserProfileResponse response = userService.updateProfile(
+                accountId,
+                request,
+                AUTHORIZATION_HEADER
+            );
+
+            assertThat(response.username()).isEqualTo(username);
+            verify(profileRepository).save(profile);
+        }
+
+        @Test
+        @DisplayName("should reject username already used by another profile")
+        void updateProfile_duplicateUsername_rejectsRequest() {
+            UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+            request.setUsername("taken-user");
+
+            stubAccountAndProfile();
+            when(profileRepository.existsByUsername("taken-user")).thenReturn(true);
+
+            assertThatThrownBy(() -> userService.updateProfile(accountId, request, AUTHORIZATION_HEADER))
+                .isInstanceOf(UsernameAlreadyExistsException.class)
+                .hasMessageContaining("Username is already in use");
+
+            verify(profileRepository, never()).save(any());
+        }
     }
 
     @Nested

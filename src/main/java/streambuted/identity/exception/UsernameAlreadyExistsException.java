@@ -4,6 +4,6 @@ import org.springframework.http.HttpStatus;
 
 public class UsernameAlreadyExistsException extends IdentityException {
     public UsernameAlreadyExistsException(String username) {
-        super("Registration cannot be completed with the provided data.", HttpStatus.CONFLICT);
+        super("Username is already in use. Choose another username.", HttpStatus.CONFLICT);
     }
 }

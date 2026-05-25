@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS user_account (
 CREATE TABLE IF NOT EXISTS user_profile (
   id uuid PRIMARY KEY,
   account_id uuid NOT NULL UNIQUE REFERENCES user_account(id),
-  username varchar(50) NOT NULL UNIQUE,
+  username varchar(100) NOT NULL UNIQUE,
   bio text,
   profile_image_asset_id varchar(255),
   created_at timestamp with time zone NOT NULL,
@@ -42,7 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_user_account_banned_until ON user_account(banned_
 CREATE TABLE IF NOT EXISTS registration_verification (
   id uuid PRIMARY KEY,
   email varchar(320) NOT NULL,
-  username varchar(50) NOT NULL,
+  username varchar(100) NOT NULL,
   password_hash varchar(60) NOT NULL,
   code_hash varchar(60) NOT NULL,
   status varchar(20) NOT NULL,

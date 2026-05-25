@@ -145,7 +145,7 @@ public class AdminAccountBootstrap {
             String suffixText = "-" + suffix;
             String prefix = preferredUsername.substring(
                 0,
-                Math.min(preferredUsername.length(), 50 - suffixText.length())
+                Math.min(preferredUsername.length(), 100 - suffixText.length())
             );
             String candidate = prefix + suffixText;
             if (!profileRepository.existsByUsername(candidate)) {
@@ -167,8 +167,8 @@ public class AdminAccountBootstrap {
             throw new IllegalStateException("ADMIN_BOOTSTRAP_EMAIL must be a valid email address.");
         }
 
-        if (username.length() < 3 || username.length() > 50) {
-            throw new IllegalStateException("ADMIN_BOOTSTRAP_USERNAME must be between 3 and 50 characters.");
+        if (username.length() < 3 || username.length() > 100) {
+            throw new IllegalStateException("ADMIN_BOOTSTRAP_USERNAME must be between 3 and 100 characters.");
         }
 
         if (!password.equals(password.trim())) {

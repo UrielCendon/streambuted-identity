@@ -56,6 +56,7 @@ public class AuthServiceImpl implements AuthService {
     private final ObjectMapper objectMapper;
 
     private static final Pattern NON_USERNAME_CHARS = Pattern.compile("[^a-z0-9._-]");
+    private static final int USERNAME_MAX_LENGTH = 100;
     private static final int PASSWORD_MIN_LENGTH = 8;
     private static final int PASSWORD_MAX_LENGTH = 15;
     private static final Pattern PASSWORD_UPPERCASE = Pattern.compile(".*[A-Z].*");
@@ -345,7 +346,7 @@ public class AuthServiceImpl implements AuthService {
             base = "user_" + base;
         }
 
-        base = base.substring(0, Math.min(base.length(), 50));
+        base = base.substring(0, Math.min(base.length(), USERNAME_MAX_LENGTH));
 
         if (!profileRepository.existsByUsername(base)) {
             return base;
@@ -353,7 +354,7 @@ public class AuthServiceImpl implements AuthService {
 
         for (int suffix = 2; suffix < 1_000; suffix++) {
             String suffixText = "-" + suffix;
-            String prefix = base.substring(0, Math.min(base.length(), 50 - suffixText.length()));
+            String prefix = base.substring(0, Math.min(base.length(), USERNAME_MAX_LENGTH - suffixText.length()));
             String candidate = prefix + suffixText;
             if (!profileRepository.existsByUsername(candidate)) {
                 return candidate;

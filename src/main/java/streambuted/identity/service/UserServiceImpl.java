@@ -24,6 +24,7 @@ import streambuted.identity.exception.AdminModerationException;
 import streambuted.identity.exception.ProfileUpdateException;
 import streambuted.identity.exception.RolePromotionException;
 import streambuted.identity.exception.UserNotFoundException;
+import streambuted.identity.exception.UsernameAlreadyExistsException;
 import streambuted.identity.media.MediaAssetClient;
 import streambuted.identity.media.MediaAssetMetadata;
 import streambuted.identity.messaging.UserPromotedEvent;
@@ -47,7 +48,7 @@ public class UserServiceImpl implements UserService {
 
     private static final String PROFILE_IMAGE_ASSET_TYPE = "PROFILE_IMAGE";
     private static final int USERNAME_MIN_LENGTH = 3;
-    private static final int USERNAME_MAX_LENGTH = 50;
+    private static final int USERNAME_MAX_LENGTH = 100;
     private static final int BIO_MAX_LENGTH = 1000;
 
     private final UserAccountRepository accountRepository;
@@ -214,8 +215,15 @@ public class UserServiceImpl implements UserService {
                 || normalizedUsername.length() > USERNAME_MAX_LENGTH
         ) {
             throw ProfileUpdateException.badRequest(
-                "Username must be between 3 and 50 characters."
+                "Username must be between 3 and 100 characters."
             );
+        }
+
+        if (
+            !normalizedUsername.equals(profile.getUsername())
+                && profileRepository.existsByUsername(normalizedUsername)
+        ) {
+            throw new UsernameAlreadyExistsException(normalizedUsername);
         }
 
         profile.setUsername(normalizedUsername);

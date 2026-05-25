@@ -9,6 +9,6 @@ import org.springframework.http.HttpStatus;
 /** Thrown when a registration email or username is already taken. */
 public class EmailAlreadyExistsException extends IdentityException {
     public EmailAlreadyExistsException(String email) {
-        super("Registration cannot be completed with the provided data.", HttpStatus.CONFLICT);
+        super("Email is already registered. Sign in or use another email address.", HttpStatus.CONFLICT);
     }
 }

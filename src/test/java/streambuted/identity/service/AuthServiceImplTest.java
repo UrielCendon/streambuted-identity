@@ -131,7 +131,7 @@ class AuthServiceImplTest {
 
             assertThatThrownBy(() -> authService.startRegistration(request))
                 .isInstanceOf(EmailAlreadyExistsException.class)
-                .hasMessageContaining("Registration cannot be completed");
+                .hasMessageContaining("Email is already registered");
 
             verify(registrationVerificationService, never()).startRegistration(any(), any());
             verify(passwordEncoder, never()).encode(any());
