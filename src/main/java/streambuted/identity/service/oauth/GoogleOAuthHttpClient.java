@@ -32,7 +32,7 @@ public class GoogleOAuthHttpClient implements GoogleOAuthClient {
             return new GoogleUserInfo(tokenInfo.subject(), tokenInfo.email(), tokenInfo.name());
         } catch (RestClientException ex) {
             log.warn("Google OAuth exchange failed while calling Google API: {}", ex.getClass().getSimpleName());
-            throw new GoogleAuthenticationException("Google OAuth exchange failed.");
+            throw new GoogleAuthenticationException("No se pudo completar el intercambio con Google OAuth.");
         }
     }
 
@@ -55,7 +55,7 @@ public class GoogleOAuthHttpClient implements GoogleOAuthClient {
 
         GoogleTokenResponse body = response.getBody();
         if (body == null || body.idToken() == null || body.idToken().isBlank()) {
-            throw new GoogleAuthenticationException("Google did not return an identity token.");
+            throw new GoogleAuthenticationException("Google no devolvio un token de identidad.");
         }
 
         return body;
@@ -70,7 +70,7 @@ public class GoogleOAuthHttpClient implements GoogleOAuthClient {
 
         GoogleTokenInfoResponse tokenInfo = restTemplate.getForObject(uri, GoogleTokenInfoResponse.class);
         if (tokenInfo == null) {
-            throw new GoogleAuthenticationException("Google token verification failed.");
+            throw new GoogleAuthenticationException("No se pudo verificar el token de Google.");
         }
 
         return tokenInfo;
@@ -81,19 +81,19 @@ public class GoogleOAuthHttpClient implements GoogleOAuthClient {
         GoogleOAuthProperties properties
     ) {
         if (!properties.getClientId().equals(tokenInfo.audience())) {
-            throw new GoogleAuthenticationException("Google token audience is invalid.");
+            throw new GoogleAuthenticationException("La audiencia del token de Google no es valida.");
         }
 
         if (!Boolean.TRUE.equals(tokenInfo.emailVerified())) {
-            throw new GoogleAuthenticationException("Google email is not verified.");
+            throw new GoogleAuthenticationException("El correo de Google no esta verificado.");
         }
 
         if (tokenInfo.subject() == null || tokenInfo.subject().isBlank()) {
-            throw new GoogleAuthenticationException("Google account identifier is missing.");
+            throw new GoogleAuthenticationException("Falta el identificador de la cuenta de Google.");
         }
 
         if (tokenInfo.email() == null || tokenInfo.email().isBlank()) {
-            throw new GoogleAuthenticationException("Google email is missing.");
+            throw new GoogleAuthenticationException("Google no devolvio el correo de la cuenta.");
         }
     }
 

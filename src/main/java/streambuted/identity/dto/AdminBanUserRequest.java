@@ -9,15 +9,15 @@ import jakarta.validation.constraints.Size;
  * Request used by administrators to temporarily or permanently ban an account.
  */
 public record AdminBanUserRequest(
-    @NotBlank(message = "banType is required.")
+    @NotBlank(message = "banType es obligatorio.")
     String banType,
 
-    @Min(value = 1, message = "durationAmount must be at least 1.")
-    @Max(value = 3650, message = "durationAmount must not exceed 3650.")
+    @Min(value = 1, message = "durationAmount debe ser al menos 1.")
+    @Max(value = 3650, message = "durationAmount no debe superar 3650.")
     Integer durationAmount,
 
     String durationUnit,
 
-    @Size(max = 500, message = "reason must not exceed 500 characters.")
+    @Size(max = 500, message = "reason no debe superar 500 caracteres.")
     String reason
 ) {}

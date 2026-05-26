@@ -23,7 +23,7 @@ import java.util.UUID;
 @Transactional
 public class RegistrationVerificationService {
 
-    private static final String CODE_SENT_MESSAGE = "Verification code sent.";
+    private static final String CODE_SENT_MESSAGE = "Codigo de verificacion enviado.";
 
     private final RegistrationVerificationRepository verificationRepository;
     private final PasswordEncoder passwordEncoder;
@@ -55,7 +55,7 @@ public class RegistrationVerificationService {
             current.getStatus() == RegistrationVerificationStatus.VERIFIED ||
             current.getStatus() == RegistrationVerificationStatus.REPLACED) {
             throw new InvalidRegistrationVerificationException(
-                "Verification attempt is no longer valid. Start registration again."
+                "El intento de verificacion ya no es valido. Inicia el registro nuevamente."
             );
         }
 
@@ -85,7 +85,7 @@ public class RegistrationVerificationService {
         }
 
         if (!passwordEncoder.matches(request.code(), attempt.getCodeHash())) {
-            throw new InvalidRegistrationVerificationException("El código de verificación es incorrecto.");
+            throw new InvalidRegistrationVerificationException("El codigo de verificacion es incorrecto.");
         }
 
         attempt.setStatus(RegistrationVerificationStatus.VERIFIED);
@@ -128,7 +128,7 @@ public class RegistrationVerificationService {
         return verificationRepository
             .findByIdAndEmail(attemptId, normalizeEmail(email))
             .orElseThrow(() -> new InvalidRegistrationVerificationException(
-                "El intento de verificación no fue encontrado."
+                "El intento de verificacion no fue encontrado."
             ));
     }
 
@@ -156,7 +156,7 @@ public class RegistrationVerificationService {
         }
 
         throw new InvalidRegistrationVerificationException(
-            "El código de verificación ya no es válido. Solicita un nuevo código."
+            "El codigo de verificacion ya no es valido. Solicita un nuevo codigo."
         );
     }
 

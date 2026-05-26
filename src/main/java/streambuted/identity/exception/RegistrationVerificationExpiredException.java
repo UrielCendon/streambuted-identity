@@ -4,6 +4,6 @@ import org.springframework.http.HttpStatus;
 
 public class RegistrationVerificationExpiredException extends IdentityException {
     public RegistrationVerificationExpiredException() {
-        super("Verification code has expired. Request a new code.", HttpStatus.GONE);
+        super("El codigo de verificacion expiro. Solicita uno nuevo.", HttpStatus.GONE);
     }
 }

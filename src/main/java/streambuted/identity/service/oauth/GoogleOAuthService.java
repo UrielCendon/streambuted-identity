@@ -34,7 +34,7 @@ public class GoogleOAuthService {
         assertConfigured();
 
         if (code == null || code.isBlank()) {
-            throw new GoogleAuthenticationException("Google authorization code is missing.");
+            throw new GoogleAuthenticationException("Falta el codigo de autorizacion de Google.");
         }
 
         return googleOAuthClient.exchangeCode(code, properties);
@@ -44,7 +44,7 @@ public class GoogleOAuthService {
         if (requestState == null || requestState.isBlank() ||
             cookieState == null || cookieState.isBlank() ||
             !requestState.equals(cookieState)) {
-            throw new GoogleAuthenticationException("Google OAuth state is invalid.");
+            throw new GoogleAuthenticationException("El estado de Google OAuth no es valido.");
         }
     }
 
@@ -64,7 +64,7 @@ public class GoogleOAuthService {
         if (properties.getClientId() == null || properties.getClientId().isBlank() ||
             properties.getClientSecret() == null || properties.getClientSecret().isBlank() ||
             properties.getCallbackUrl() == null || properties.getCallbackUrl().isBlank()) {
-            throw new GoogleAuthenticationException("Google OAuth is not configured.");
+            throw new GoogleAuthenticationException("Google OAuth no esta configurado.");
         }
     }
 }

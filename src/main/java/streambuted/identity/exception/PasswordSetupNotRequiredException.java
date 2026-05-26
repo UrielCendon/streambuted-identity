@@ -5,6 +5,6 @@ import org.springframework.http.HttpStatus;
 public class PasswordSetupNotRequiredException extends IdentityException {
 
     public PasswordSetupNotRequiredException() {
-        super("This account does not require Google password setup.", HttpStatus.BAD_REQUEST);
+        super("Esta cuenta no requiere configurar contrasena de Google.", HttpStatus.BAD_REQUEST);
     }
 }

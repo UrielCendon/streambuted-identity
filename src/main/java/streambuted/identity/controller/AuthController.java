@@ -209,7 +209,7 @@ public class AuthController {
         clearGoogleModeCookie(servletResponse);
 
         if (error != null && !error.isBlank()) {
-            return redirectToFrontend("google-error", "Google OAuth was cancelled or rejected.");
+            return redirectToFrontend("google-error", "Google OAuth fue cancelado o rechazado.");
         }
 
         try {
@@ -222,8 +222,8 @@ public class AuthController {
             return redirectToFrontend(
                 result.passwordSetupRequired() ? "google-password-setup" : "google-success",
                 result.passwordSetupRequired()
-                    ? "Complete your password setup to finish Google registration."
-                    : "Google sign-in completed."
+                    ? "Completa la configuracion de contrasena para finalizar el registro con Google."
+                    : "Inicio de sesion con Google completado."
             );
         } catch (IdentityException ex) {
             log.warn("Google OAuth failed: {}", ex.getMessage());

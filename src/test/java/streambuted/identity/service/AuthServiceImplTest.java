@@ -103,7 +103,7 @@ class AuthServiceImplTest {
                 VALID_EMAIL,
                 "pending",
                 900L,
-                "Verification code sent."
+                "Codigo de verificacion enviado."
             );
 
             when(accountRepository.findByEmail(VALID_EMAIL)).thenReturn(Optional.empty());
@@ -131,7 +131,7 @@ class AuthServiceImplTest {
 
             assertThatThrownBy(() -> authService.startRegistration(request))
                 .isInstanceOf(EmailAlreadyExistsException.class)
-                .hasMessageContaining("Email is already registered");
+                .hasMessageContaining("Ese correo ya esta registrado");
 
             verify(registrationVerificationService, never()).startRegistration(any(), any());
             verify(passwordEncoder, never()).encode(any());
@@ -334,7 +334,7 @@ class AuthServiceImplTest {
 
             assertThatThrownBy(() -> authService.startRegistration(request))
                 .isInstanceOf(PasswordPolicyException.class)
-                .hasMessageContaining("uppercase");
+                .hasMessageContaining("mayuscula");
         }
 
         @Test
@@ -344,7 +344,7 @@ class AuthServiceImplTest {
 
             assertThatThrownBy(() -> authService.startRegistration(request))
                 .isInstanceOf(PasswordPolicyException.class)
-                .hasMessageContaining("between 8 and 15 characters");
+                .hasMessageContaining("entre 8 y 15 caracteres");
         }
 
         @Test
@@ -470,7 +470,7 @@ class AuthServiceImplTest {
 
             assertThatThrownBy(() -> authService.authenticateWithGoogle(googleUser, GoogleOAuthMode.LOGIN))
                 .isInstanceOf(GoogleAuthenticationException.class)
-                .hasMessageContaining("Register with Google first");
+                .hasMessageContaining("Registrate con Google primero");
 
             verify(accountRepository, never()).save(any());
         }
@@ -580,7 +580,7 @@ class AuthServiceImplTest {
                 new SetupPasswordRequest("SecurePass1!", "SecurePass2!")
             ))
                 .isInstanceOf(PasswordPolicyException.class)
-                .hasMessageContaining("confirmation");
+                .hasMessageContaining("no coinciden");
         }
     }
 

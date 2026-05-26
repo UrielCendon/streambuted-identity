@@ -5,11 +5,11 @@ import jakarta.validation.constraints.Size;
 
 public record SetupPasswordRequest(
 
-    @NotBlank(message = "Password must not be blank")
-    @Size(min = 8, max = 15, message = "Password must be between 8 and 15 characters")
+    @NotBlank(message = "La contrasena es obligatoria.")
+    @Size(min = 8, max = 15, message = "La contrasena debe tener entre 8 y 15 caracteres.")
     String password,
 
-    @NotBlank(message = "Password confirmation must not be blank")
-    @Size(min = 8, max = 15, message = "Password confirmation must be between 8 and 15 characters")
+    @NotBlank(message = "La confirmacion de contrasena es obligatoria.")
+    @Size(min = 8, max = 15, message = "La confirmacion de contrasena debe tener entre 8 y 15 caracteres.")
     String confirmPassword
 ) {}

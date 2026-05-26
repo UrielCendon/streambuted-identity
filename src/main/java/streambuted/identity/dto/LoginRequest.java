@@ -9,12 +9,12 @@ import jakarta.validation.constraints.Size;
  */
 public record LoginRequest(
 
-    @NotBlank(message = "Email must not be blank")
-    @Email(message = "Email must be a valid address")
-    @Size(max = 320, message = "Email must not exceed 320 characters")
+    @NotBlank(message = "El correo es obligatorio.")
+    @Email(message = "El correo debe tener un formato valido.")
+    @Size(max = 320, message = "El correo no debe superar 320 caracteres.")
     String email,
 
-    @NotBlank(message = "Password must not be blank")
-    @Size(min = 8, max = 15, message = "Password must be between 8 and 15 characters")
+    @NotBlank(message = "La contrasena es obligatoria.")
+    @Size(min = 8, max = 15, message = "La contrasena debe tener entre 8 y 15 caracteres.")
     String password
 ) {}

@@ -46,7 +46,7 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
     public MediaAssetMetadata getAssetMetadata(UUID assetId, String authorizationHeader) {
         if (authorizationHeader == null || authorizationHeader.isBlank()) {
             throw ProfileUpdateException.unauthorized(
-                "Authentication context is required to validate media assets."
+                "Se requiere contexto de autenticacion para validar archivos multimedia."
             );
         }
 
@@ -70,7 +70,7 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
         } catch (RuntimeException ex) {
             log.warn("Unexpected Media gRPC validation failure for assetId={}", assetId, ex);
             throw ProfileUpdateException.badGateway(
-                "Media Service could not validate the referenced asset."
+                "Media Service no pudo validar el archivo indicado."
             );
         }
     }
@@ -99,13 +99,13 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
 
         if (!expectedAssetId.equals(responseAssetId)) {
             throw ProfileUpdateException.badGateway(
-                "Media Service returned metadata for a different asset."
+                "Media Service devolvio metadatos de un archivo diferente."
             );
         }
 
         if (response.getAssetType().isBlank() || response.getContentType().isBlank()) {
             throw ProfileUpdateException.badGateway(
-                "Media Service returned an invalid asset metadata response."
+                "Media Service devolvio una respuesta de metadatos invalida."
             );
         }
 
@@ -124,7 +124,7 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
             return UUID.fromString(value);
         } catch (RuntimeException ex) {
             throw ProfileUpdateException.badGateway(
-                "Media Service returned an invalid " + fieldName + "."
+                "Media Service devolvio un campo invalido: " + fieldName + "."
             );
         }
     }
@@ -133,22 +133,22 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
         Status.Code code = error.getStatus().getCode();
         return switch (code) {
             case UNAUTHENTICATED -> ProfileUpdateException.unauthorized(
-                "Media Service rejected the authorization token."
+                "Media Service rechazo el token de autorizacion."
             );
             case PERMISSION_DENIED -> ProfileUpdateException.forbidden(
-                "The referenced media asset is not accessible."
+                "El archivo multimedia indicado no es accesible."
             );
             case NOT_FOUND, INVALID_ARGUMENT -> ProfileUpdateException.badRequest(
-                "Asset " + assetId + " was not found."
+                "No se encontro el archivo multimedia " + assetId + "."
             );
             case UNAVAILABLE -> ProfileUpdateException.serviceUnavailable(
-                "Media Service is temporarily unavailable for asset validation."
+                "Media Service no esta disponible temporalmente para validar archivos."
             );
             case DEADLINE_EXCEEDED -> ProfileUpdateException.gatewayTimeout(
-                "Media Service timed out while validating the referenced asset."
+                "Media Service tardo demasiado al validar el archivo indicado."
             );
             default -> ProfileUpdateException.badGateway(
-                "Media Service could not validate the referenced asset."
+                "Media Service no pudo validar el archivo indicado."
             );
         };
     }

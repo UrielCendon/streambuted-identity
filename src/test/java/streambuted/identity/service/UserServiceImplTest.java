@@ -107,7 +107,7 @@ class UserServiceImplTest {
 
             assertThatThrownBy(() -> userService.getProfile(unknownId))
                 .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining(unknownId.toString());
+                .hasMessageContaining("El usuario solicitado no existe");
         }
     }
 
@@ -295,7 +295,7 @@ class UserServiceImplTest {
 
             assertThatThrownBy(() -> userService.updateProfile(accountId, request, AUTHORIZATION_HEADER))
                 .isInstanceOf(UsernameAlreadyExistsException.class)
-                .hasMessageContaining("Username is already in use");
+                .hasMessageContaining("Ese nombre de usuario ya esta en uso");
 
             verify(profileRepository, never()).save(any());
         }

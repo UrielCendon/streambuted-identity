@@ -219,7 +219,7 @@ class TokenValidatorGrpcServiceTest {
             TokenResponse response = responseCaptor.getValue();
 
             assertThat(response.getIsValid()).isFalse();
-            assertThat(response.getErrorMessage()).containsIgnoringCase("not found");
+            assertThat(response.getErrorMessage()).contains("La cuenta de usuario no existe");
         }
 
         @Test

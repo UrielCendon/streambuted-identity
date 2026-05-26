@@ -99,8 +99,8 @@ public class UserServiceImpl implements UserService {
 
         if (account.getRole() != Role.LISTENER) {
             throw new RolePromotionException(
-                "Role promotion is only available to accounts with the LISTENER role. "
-                + "Current role: " + account.getRole().name()
+                "Solo las cuentas LISTENER pueden convertirse en artista. "
+                + "Rol actual: " + account.getRole().name()
             );
         }
 
@@ -153,14 +153,14 @@ public class UserServiceImpl implements UserService {
         AdminBanUserRequest request
     ) {
         if (adminUserId.equals(targetUserId)) {
-            throw AdminModerationException.forbidden("Administrators cannot ban their own account.");
+            throw AdminModerationException.forbidden("Los administradores no pueden suspender su propia cuenta.");
         }
 
         UserAccountEntity account = accountRepository.findById(targetUserId)
             .orElseThrow(() -> new UserNotFoundException(targetUserId.toString()));
 
         if (account.getRole() == Role.ADMIN) {
-            throw AdminModerationException.forbidden("Administrator accounts cannot be banned from moderation.");
+            throw AdminModerationException.forbidden("Las cuentas administradoras no pueden suspenderse desde moderacion.");
         }
 
         Instant now = Instant.now();
@@ -180,7 +180,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public AdminUserResponse unbanUser(UUID adminUserId, UUID targetUserId) {
         if (adminUserId.equals(targetUserId)) {
-            throw AdminModerationException.forbidden("Administrators cannot reactivate their own account here.");
+            throw AdminModerationException.forbidden("Los administradores no pueden reactivar su propia cuenta desde aqui.");
         }
 
         UserAccountEntity account = accountRepository.findById(targetUserId)
@@ -206,7 +206,7 @@ public class UserServiceImpl implements UserService {
 
         String username = request.username();
         if (username == null || username.isBlank()) {
-            throw ProfileUpdateException.badRequest("Username must not be blank.");
+            throw ProfileUpdateException.badRequest("El nombre de usuario es obligatorio.");
         }
 
         String normalizedUsername = username.trim();
@@ -215,7 +215,7 @@ public class UserServiceImpl implements UserService {
                 || normalizedUsername.length() > USERNAME_MAX_LENGTH
         ) {
             throw ProfileUpdateException.badRequest(
-                "Username must be between 3 and 100 characters."
+                "El nombre de usuario debe tener entre 3 y 100 caracteres."
             );
         }
 
@@ -246,7 +246,7 @@ public class UserServiceImpl implements UserService {
         String normalizedBio = bio.trim();
         if (normalizedBio.length() > BIO_MAX_LENGTH) {
             throw ProfileUpdateException.badRequest(
-                "Bio must not exceed 1000 characters."
+                "La biografia no debe superar 1000 caracteres."
             );
         }
 
@@ -277,13 +277,13 @@ public class UserServiceImpl implements UserService {
 
         if (!metadata.exists() || !PROFILE_IMAGE_ASSET_TYPE.equals(metadata.assetType())) {
             throw ProfileUpdateException.badRequest(
-                "profileImageAssetId must reference an existing PROFILE_IMAGE asset."
+                "profileImageAssetId debe referenciar un archivo PROFILE_IMAGE existente."
             );
         }
 
         if (!userId.equals(metadata.ownerUserId())) {
             throw ProfileUpdateException.forbidden(
-                "The referenced media asset does not belong to the authenticated user."
+                "El archivo multimedia indicado no pertenece al usuario autenticado."
             );
         }
 
@@ -295,7 +295,7 @@ public class UserServiceImpl implements UserService {
             return UUID.fromString(profileImageAssetId.trim());
         } catch (RuntimeException ex) {
             throw ProfileUpdateException.badRequest(
-                "profileImageAssetId must be a valid UUID."
+                "profileImageAssetId debe ser un UUID valido."
             );
         }
     }
@@ -345,11 +345,11 @@ public class UserServiceImpl implements UserService {
         }
 
         if (!"TEMPORARY".equals(banType)) {
-            throw AdminModerationException.badRequest("banType must be TEMPORARY or PERMANENT.");
+            throw AdminModerationException.badRequest("banType debe ser TEMPORARY o PERMANENT.");
         }
 
         if (request.durationAmount() == null) {
-            throw AdminModerationException.badRequest("durationAmount is required for temporary bans.");
+            throw AdminModerationException.badRequest("durationAmount es obligatorio para suspensiones temporales.");
         }
 
         String unit = request.durationUnit() == null ? "DAYS" : request.durationUnit().trim().toUpperCase();
@@ -357,7 +357,7 @@ public class UserServiceImpl implements UserService {
             case "HOURS" -> now.plus(request.durationAmount(), ChronoUnit.HOURS);
             case "DAYS" -> now.plus(request.durationAmount(), ChronoUnit.DAYS);
             case "WEEKS" -> now.plus(request.durationAmount() * 7L, ChronoUnit.DAYS);
-            default -> throw AdminModerationException.badRequest("durationUnit must be HOURS, DAYS or WEEKS.");
+            default -> throw AdminModerationException.badRequest("durationUnit debe ser HOURS, DAYS o WEEKS.");
         };
     }
 

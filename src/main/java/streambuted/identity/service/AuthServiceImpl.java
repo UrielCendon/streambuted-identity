@@ -177,7 +177,7 @@ public class AuthServiceImpl implements AuthService {
 
         validatePasswordPolicy(request.password());
         if (!request.password().equals(request.confirmPassword())) {
-            throw new PasswordPolicyException("Password confirmation does not match.");
+            throw new PasswordPolicyException("Las contrasenas no coinciden.");
         }
 
         account.setPasswordHash(passwordEncoder.encode(request.password()));
@@ -366,23 +366,23 @@ public class AuthServiceImpl implements AuthService {
 
     private void validatePasswordPolicy(String password) {
         if (password == null || password.isBlank()) {
-            throw new PasswordPolicyException("Password must not be blank.");
+            throw new PasswordPolicyException("La contrasena es obligatoria.");
         }
 
         if (password.length() < PASSWORD_MIN_LENGTH || password.length() > PASSWORD_MAX_LENGTH) {
-            throw new PasswordPolicyException("Password must be between 8 and 15 characters.");
+            throw new PasswordPolicyException("La contrasena debe tener entre 8 y 15 caracteres.");
         }
 
         if (!PASSWORD_UPPERCASE.matcher(password).matches()) {
-            throw new PasswordPolicyException("Password must contain at least one uppercase letter.");
+            throw new PasswordPolicyException("La contrasena debe incluir al menos una mayuscula.");
         }
 
         if (!PASSWORD_DIGIT.matcher(password).matches()) {
-            throw new PasswordPolicyException("Password must contain at least one number.");
+            throw new PasswordPolicyException("La contrasena debe incluir al menos un numero.");
         }
 
         if (!PASSWORD_SPECIAL.matcher(password).matches()) {
-            throw new PasswordPolicyException("Password must contain at least one special character.");
+            throw new PasswordPolicyException("La contrasena debe incluir al menos un simbolo especial.");
         }
     }
 
@@ -409,7 +409,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (mode == GoogleOAuthMode.LOGIN) {
             throw new GoogleAuthenticationException(
-                "No account is linked to this email. Register with Google first."
+                "No hay una cuenta vinculada a este correo. Registrate con Google primero."
             );
         }
 

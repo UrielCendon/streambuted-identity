@@ -67,7 +67,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableMessage(HttpMessageNotReadableException ex) {
         ErrorResponse body = ErrorResponse.of(
             "MalformedJsonException",
-            "The request body is missing, malformed, or cannot be parsed.",
+            "El cuerpo de la solicitud falta, esta mal formado o no se puede procesar.",
             400
         );
         return ResponseEntity.badRequest().body(body);
@@ -79,7 +79,7 @@ public class GlobalExceptionHandler {
     ) {
         ErrorResponse body = ErrorResponse.of(
             "MissingRequestParameterException",
-            "Missing required parameter: " + ex.getParameterName(),
+            "Falta el parametro obligatorio: " + ex.getParameterName(),
             400
         );
         return ResponseEntity.badRequest().body(body);
@@ -89,7 +89,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         ErrorResponse body = ErrorResponse.of(
             "MethodArgumentTypeMismatchException",
-            "Parameter '" + ex.getName() + "' has an invalid value.",
+            "El parametro '" + ex.getName() + "' tiene un valor no valido.",
             400
         );
         return ResponseEntity.badRequest().body(body);
@@ -109,13 +109,21 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex) {
-        ErrorResponse body = ErrorResponse.of("AuthenticationException", ex.getMessage(), 401);
+        ErrorResponse body = ErrorResponse.of(
+            "AuthenticationException",
+            "Falta el token Bearer o no es valido.",
+            401
+        );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
-        ErrorResponse body = ErrorResponse.of("AccessDeniedException", ex.getMessage(), 403);
+        ErrorResponse body = ErrorResponse.of(
+            "AccessDeniedException",
+            "No tienes permisos para acceder a este recurso.",
+            403
+        );
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
@@ -124,9 +132,20 @@ public class GlobalExceptionHandler {
         log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
         ErrorResponse body = ErrorResponse.of(
             "DataIntegrityViolationException",
-            "The requested operation violates a data constraint.",
+            "La operacion viola una restriccion de datos.",
             409
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleUnexpectedException(Exception ex) {
+        log.error("Unhandled exception", ex);
+        ErrorResponse body = ErrorResponse.of(
+            "InternalServerError",
+            "Ocurrio un error interno. Intenta de nuevo mas tarde.",
+            500
+        );
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }

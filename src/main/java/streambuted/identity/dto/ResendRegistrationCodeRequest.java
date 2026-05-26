@@ -9,11 +9,11 @@ import java.util.UUID;
 
 public record ResendRegistrationCodeRequest(
 
-    @NotNull(message = "Verification attempt id is required")
+    @NotNull(message = "El identificador del intento de verificacion es obligatorio.")
     UUID attemptId,
 
-    @NotBlank(message = "Email must not be blank")
-    @Email(message = "Email must be a valid address")
-    @Size(max = 320, message = "Email must not exceed 320 characters")
+    @NotBlank(message = "El correo es obligatorio.")
+    @Email(message = "El correo debe tener un formato valido.")
+    @Size(max = 320, message = "El correo no debe superar 320 caracteres.")
     String email
 ) {}

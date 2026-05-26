@@ -5,6 +5,6 @@ import org.springframework.http.HttpStatus;
 public class InvalidAccessTokenException extends IdentityException {
 
     public InvalidAccessTokenException() {
-        super("Invalid or expired JWT token.", HttpStatus.UNAUTHORIZED);
+        super("El token JWT es invalido o expiro.", HttpStatus.UNAUTHORIZED);
     }
 }

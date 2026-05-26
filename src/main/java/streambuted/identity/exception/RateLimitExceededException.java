@@ -4,6 +4,6 @@ import org.springframework.http.HttpStatus;
 
 public class RateLimitExceededException extends IdentityException {
     public RateLimitExceededException() {
-        super("Too many attempts. Please wait before trying again.", HttpStatus.TOO_MANY_REQUESTS);
+        super("Demasiados intentos. Espera antes de volver a intentarlo.", HttpStatus.TOO_MANY_REQUESTS);
     }
 }

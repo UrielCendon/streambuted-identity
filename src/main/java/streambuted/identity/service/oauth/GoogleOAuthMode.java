@@ -16,7 +16,7 @@ public enum GoogleOAuthMode {
         return switch (rawValue.trim().toLowerCase(Locale.ROOT)) {
             case "login" -> LOGIN;
             case "register" -> REGISTER;
-            default -> throw new GoogleAuthenticationException("Google OAuth mode is invalid.");
+            default -> throw new GoogleAuthenticationException("El modo de Google OAuth no es valido.");
         };
     }
 }

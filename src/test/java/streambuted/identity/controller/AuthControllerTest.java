@@ -87,7 +87,7 @@ class AuthControllerTest {
                 "listener@streambuted.com",
                 "pending",
                 900L,
-                "Verification code sent."
+                "Codigo de verificacion enviado."
             ));
 
         mockMvc.perform(post("/api/v1/auth/register")

@@ -68,6 +68,6 @@ class VerificationEmailServiceTest {
             Instant.parse("2026-05-13T12:15:00Z")
         ))
             .isInstanceOf(VerificationEmailDeliveryException.class)
-            .hasMessageContaining("Verification email could not be sent");
+            .hasMessageContaining("No se pudo enviar el correo de verificacion");
     }
 }

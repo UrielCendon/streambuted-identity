@@ -44,7 +44,7 @@ public class TokenValidatorGrpcService extends TokenValidatorGrpc.TokenValidator
         String token = request.getToken();
 
         if (token == null || token.isBlank()) {
-            responseObserver.onNext(buildInvalidResponse("Token must not be empty"));
+            responseObserver.onNext(buildInvalidResponse("El token es obligatorio."));
             responseObserver.onCompleted();
             return;
         }
@@ -53,7 +53,7 @@ public class TokenValidatorGrpcService extends TokenValidatorGrpc.TokenValidator
 
         if (claimsOpt.isEmpty()) {
             log.debug("gRPC token validation failed: invalid or expired JWT");
-            responseObserver.onNext(buildInvalidResponse("Token is invalid or expired"));
+            responseObserver.onNext(buildInvalidResponse("El token es invalido o expiro."));
             responseObserver.onCompleted();
             return;
         }
@@ -63,13 +63,13 @@ public class TokenValidatorGrpcService extends TokenValidatorGrpc.TokenValidator
         String subject = claims.getSubject();
 
         if (subject == null || subject.isBlank()) {
-            responseObserver.onNext(buildInvalidResponse("Malformed token subject"));
+            responseObserver.onNext(buildInvalidResponse("El identificador del token no es valido."));
             responseObserver.onCompleted();
             return;
         }
 
         if (!isUuid(subject)) {
-            responseObserver.onNext(buildInvalidResponse("Malformed token subject"));
+            responseObserver.onNext(buildInvalidResponse("El identificador del token no es valido."));
             responseObserver.onCompleted();
             return;
         }
@@ -79,7 +79,7 @@ public class TokenValidatorGrpcService extends TokenValidatorGrpc.TokenValidator
         Optional<UserAccountEntity> accountOpt = accountRepository.findById(userId);
 
         if (accountOpt.isEmpty()) {
-            responseObserver.onNext(buildInvalidResponse("User account not found"));
+            responseObserver.onNext(buildInvalidResponse("La cuenta de usuario no existe o ya no esta disponible."));
             responseObserver.onCompleted();
             return;
         }
