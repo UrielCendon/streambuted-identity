@@ -48,6 +48,12 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins:http://localhost:5173}")
     private String allowedOriginsProperty;
 
+    @Value("${app.desktop-auth.electron-renderer-origin:app://streambuted}")
+    private String electronRendererOrigin;
+
+    @Value("${app.desktop-auth.web-allowed-origins:http://localhost:5173,http://localhost}")
+    private String desktopAuthWebAllowedOriginsProperty;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -80,6 +86,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/google").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/google/callback").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/google/callback").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/desktop/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/desktop/refresh").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/desktop/logout").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/desktop/handoff-codes").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/desktop/exchange").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/.well-known/jwks.json").permitAll()
                 // Actuator health is public for infrastructure checks.
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
@@ -116,14 +127,11 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        List<String> allowedOrigins = Arrays.stream(allowedOriginsProperty.split(","))
-            .map(String::trim)
-            .filter(origin -> !origin.isBlank())
-            .toList();
-
-        if (allowedOrigins.isEmpty() || allowedOrigins.contains("*")) {
-            throw new IllegalStateException("cors.allowed-origins must define explicit origins and cannot include '*'.");
-        }
+        List<String> allowedOrigins = parseExplicitOrigins("cors.allowed-origins", allowedOriginsProperty);
+        List<String> desktopAuthWebOrigins = parseExplicitOrigins(
+            "app.desktop-auth.web-allowed-origins",
+            desktopAuthWebAllowedOriginsProperty
+        );
 
         CorsConfiguration corsConfiguration = new CorsConfiguration();
         corsConfiguration.setAllowedOrigins(allowedOrigins);
@@ -133,8 +141,54 @@ public class SecurityConfig {
         corsConfiguration.setExposedHeaders(List.of("Set-Cookie"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration(
+            "/api/v1/auth/desktop/handoff-codes",
+            desktopHandoffCorsConfiguration(desktopAuthWebOrigins)
+        );
+        source.registerCorsConfiguration("/api/v1/auth/desktop/login", desktopMainOnlyCorsConfiguration());
+        source.registerCorsConfiguration("/api/v1/auth/desktop/refresh", desktopMainOnlyCorsConfiguration());
+        source.registerCorsConfiguration("/api/v1/auth/desktop/logout", desktopMainOnlyCorsConfiguration());
+        source.registerCorsConfiguration("/api/v1/auth/desktop/exchange", desktopMainOnlyCorsConfiguration());
         source.registerCorsConfiguration("/**", corsConfiguration);
         return source;
+    }
+
+    private List<String> parseExplicitOrigins(String propertyName, String propertyValue) {
+        List<String> origins = Arrays.stream(propertyValue.split(","))
+            .map(String::trim)
+            .filter(origin -> !origin.isBlank())
+            .toList();
+
+        if (
+            origins.isEmpty() ||
+            origins.contains("*") ||
+            origins.stream().anyMatch(origin -> origin.equalsIgnoreCase("null"))
+        ) {
+            throw new IllegalStateException(propertyName + " must define explicit origins and cannot include '*' or 'null'.");
+        }
+
+        return origins;
+    }
+
+    private CorsConfiguration desktopHandoffCorsConfiguration(List<String> webOrigins) {
+        List<String> safeWebOrigins = webOrigins.stream()
+            .filter(origin -> !origin.equals(electronRendererOrigin))
+            .toList();
+
+        CorsConfiguration corsConfiguration = new CorsConfiguration();
+        corsConfiguration.setAllowedOrigins(safeWebOrigins);
+        corsConfiguration.setAllowCredentials(true);
+        corsConfiguration.setAllowedMethods(List.of("POST", "OPTIONS"));
+        corsConfiguration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        return corsConfiguration;
+    }
+
+    private CorsConfiguration desktopMainOnlyCorsConfiguration() {
+        CorsConfiguration corsConfiguration = new CorsConfiguration();
+        corsConfiguration.setAllowedOrigins(List.of());
+        corsConfiguration.setAllowedMethods(List.of("POST", "OPTIONS"));
+        corsConfiguration.setAllowedHeaders(List.of("Content-Type"));
+        return corsConfiguration;
     }
 
     private void writeJsonError(
