@@ -70,9 +70,4 @@ public interface AuthService {
      * Validates an access token against the current account state.
      */
     ValidatedTokenResponse validateAccessToken(String token);
-
-    /**
-     * Issues a fresh session for an already authenticated account.
-     */
-    LoginResponse issueSessionForAccount(UUID userId);
 }

@@ -7,6 +7,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
+import streambuted.identity.config.DesktopAuthProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,7 +62,11 @@ class SecurityConfigCorsTest {
     }
 
     private SecurityConfig config(String allowedOrigins, String handoffOrigins) {
-        SecurityConfig config = new SecurityConfig(mock(JwtAuthenticationFilter.class), new ObjectMapper());
+        SecurityConfig config = new SecurityConfig(
+            mock(JwtAuthenticationFilter.class),
+            new ObjectMapper(),
+            new DesktopAuthProperties()
+        );
         ReflectionTestUtils.setField(config, "allowedOriginsProperty", allowedOrigins);
         ReflectionTestUtils.setField(config, "desktopAuthWebAllowedOriginsProperty", handoffOrigins);
         ReflectionTestUtils.setField(config, "electronRendererOrigin", "app://streambuted");

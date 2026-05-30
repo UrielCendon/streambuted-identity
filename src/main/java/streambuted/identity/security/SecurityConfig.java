@@ -23,6 +23,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import streambuted.identity.config.DesktopAuthProperties;
 import streambuted.identity.dto.ErrorResponse;
 
 import java.io.IOException;
@@ -44,6 +45,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ObjectMapper objectMapper;
+    private final DesktopAuthProperties desktopAuthProperties;
 
     @Value("${cors.allowed-origins:http://localhost:5173}")
     private String allowedOriginsProperty;
@@ -96,6 +98,10 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 // Everything else requires a valid JWT
                 .anyRequest().authenticated()
+            )
+            .addFilterBefore(
+                new DesktopAuthEnabledFilter(desktopAuthProperties, objectMapper),
+                JwtAuthenticationFilter.class
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

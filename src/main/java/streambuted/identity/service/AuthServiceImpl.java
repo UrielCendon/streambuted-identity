@@ -244,18 +244,6 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
-    @Override
-    public LoginResponse issueSessionForAccount(UUID userId) {
-        UserAccountEntity account = accountRepository.findById(userId)
-            .orElseThrow(() -> new UserNotFoundException(userId.toString()));
-
-        ensureAccountCanAuthenticate(account);
-
-        LoginResponse response = buildTokenPair(account);
-        enqueueUserLoggedInEvent(account.getId());
-        return response;
-    }
-
     // Private helpers
 
     private RegisterRequest normalizeRegisterRequest(RegisterRequest request) {

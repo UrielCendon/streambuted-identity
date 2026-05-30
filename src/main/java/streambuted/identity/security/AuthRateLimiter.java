@@ -1,6 +1,7 @@
 package streambuted.identity.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import streambuted.identity.exception.RateLimitExceededException;
@@ -33,6 +34,7 @@ public class AuthRateLimiter {
     private final Clock clock;
     private final boolean trustForwardedHeaders;
 
+    @Autowired
     public AuthRateLimiter(
         @Value("${app.security.trust-forwarded-headers:false}") boolean trustForwardedHeaders
     ) {
