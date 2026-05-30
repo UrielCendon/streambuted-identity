@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import streambuted.identity.config.DesktopAuthProperties;
 import streambuted.identity.controller.AuthController;
 import streambuted.identity.dto.RegistrationVerificationResponse;
 import streambuted.identity.service.AuthService;
@@ -41,7 +41,7 @@ class SecurityConfigPasswordResetTest {
     private JwtProperties jwtProperties;
 
     @MockBean
-    private Environment environment;
+    private DesktopAuthProperties desktopAuthProperties;
 
     @MockBean
     private RsaJwtKeyProvider rsaJwtKeyProvider;
