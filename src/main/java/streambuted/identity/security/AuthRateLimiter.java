@@ -1,6 +1,8 @@
 package streambuted.identity.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import streambuted.identity.exception.RateLimitExceededException;
 
@@ -23,16 +25,29 @@ public class AuthRateLimiter {
     private static final int REGISTRATION_LIMIT = 5;
     private static final Duration VERIFICATION_WINDOW = Duration.ofMinutes(15);
     private static final int VERIFICATION_LIMIT = 5;
+    private static final Duration DESKTOP_HANDOFF_WINDOW = Duration.ofMinutes(1);
+    private static final int DESKTOP_HANDOFF_LIMIT = 5;
+    private static final Duration DESKTOP_EXCHANGE_WINDOW = Duration.ofMinutes(1);
+    private static final int DESKTOP_EXCHANGE_LIMIT = 10;
 
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
     private final Clock clock;
+    private final boolean trustForwardedHeaders;
 
-    public AuthRateLimiter() {
-        this(Clock.systemUTC());
+    @Autowired
+    public AuthRateLimiter(
+        @Value("${app.security.trust-forwarded-headers:false}") boolean trustForwardedHeaders
+    ) {
+        this(Clock.systemUTC(), trustForwardedHeaders);
     }
 
     AuthRateLimiter(Clock clock) {
+        this(clock, false);
+    }
+
+    AuthRateLimiter(Clock clock, boolean trustForwardedHeaders) {
         this.clock = clock;
+        this.trustForwardedHeaders = trustForwardedHeaders;
     }
 
     public void checkLogin(HttpServletRequest request, String email) {
@@ -46,6 +61,15 @@ public class AuthRateLimiter {
     public void checkVerification(HttpServletRequest request, UUID attemptId, String email) {
         String subject = attemptId == null ? normalize(email) : attemptId.toString();
         consume("verification", clientFingerprint(request, subject), VERIFICATION_LIMIT, VERIFICATION_WINDOW);
+    }
+
+    public void checkDesktopHandoff(HttpServletRequest request, UUID userId) {
+        String subject = userId == null ? "anonymous" : userId.toString();
+        consume("desktop-handoff", clientFingerprint(request, subject), DESKTOP_HANDOFF_LIMIT, DESKTOP_HANDOFF_WINDOW);
+    }
+
+    public void checkDesktopExchange(HttpServletRequest request) {
+        consume("desktop-exchange", clientFingerprint(request, "exchange"), DESKTOP_EXCHANGE_LIMIT, DESKTOP_EXCHANGE_WINDOW);
     }
 
     private void consume(String scope, String fingerprint, int limit, Duration window) {
@@ -71,11 +95,39 @@ public class AuthRateLimiter {
     }
 
     private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",", 2)[0].trim();
+        if (trustForwardedHeaders) {
+            String realIp = sanitizeHeaderIp(request.getHeader("X-Real-IP"));
+            if (realIp != null) {
+                return realIp;
+            }
+
+            String forwardedFor = request.getHeader("X-Forwarded-For");
+            if (forwardedFor != null && !forwardedFor.isBlank()) {
+                String firstForwardedIp = sanitizeHeaderIp(forwardedFor.split(",", 2)[0]);
+                if (firstForwardedIp != null) {
+                    return firstForwardedIp;
+                }
+            }
         }
+
         return request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
+    }
+
+    private String sanitizeHeaderIp(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmedValue = value.trim();
+        if (
+            trimmedValue.isBlank() ||
+            trimmedValue.length() > 64 ||
+            trimmedValue.chars().anyMatch(character -> character <= 31 || character == 127)
+        ) {
+            return null;
+        }
+
+        return trimmedValue;
     }
 
     private String normalize(String value) {
