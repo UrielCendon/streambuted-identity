@@ -33,6 +33,14 @@ public interface AuthService {
      */
     void cancelRegistration(CancelRegistrationVerificationRequest request);
 
+    RegistrationVerificationResponse startPasswordReset(StartPasswordResetRequest request);
+
+    RegistrationVerificationResponse resendPasswordResetCode(PasswordResetActionRequest request);
+
+    void verifyPasswordResetCode(VerifyPasswordResetCodeRequest request);
+
+    void completePasswordReset(CompletePasswordResetRequest request);
+
     /**
      * Creates or resolves a StreamButed account from a verified Google profile.
      */
