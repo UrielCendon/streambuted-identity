@@ -23,23 +23,52 @@ public class VerificationEmailService {
     private final Clock clock;
 
     public void sendRegistrationCode(String email, String code, Instant expiresAt) {
+        sendVerificationCode(
+            email,
+            code,
+            expiresAt,
+            emailProperties.getVerificationSubject(),
+            "registro",
+            "Tu código de verificación de StreamButed es: %s"
+        );
+    }
+
+    public void sendPasswordResetCode(String email, String code, Instant expiresAt) {
+        sendVerificationCode(
+            email,
+            code,
+            expiresAt,
+            "Código de recuperación de StreamButed",
+            "recuperacion",
+            "Tu código de recuperación de StreamButed es: %s"
+        );
+    }
+
+    private void sendVerificationCode(
+        String email,
+        String code,
+        Instant expiresAt,
+        String subject,
+        String purpose,
+        String headlineTemplate
+    ) {
         long expiresInMinutes = Math.max(1, Duration.between(clock.instant(), expiresAt).toMinutes());
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(emailProperties.getFrom());
         message.setTo(email);
-        message.setSubject(emailProperties.getVerificationSubject());
+        message.setSubject(subject);
         message.setText("""
-            Tu codigo de verificacion de StreamButed es: %s
+            %s
 
-            El codigo expira en %d minutos. Si no solicitaste este registro, puedes ignorar este correo.
+            El codigo expira en %d minutos. Si no solicitaste esta %s, puedes ignorar este correo.
 
             Expira en: %s
-            """.formatted(code, expiresInMinutes, expiresAt));
+            """.formatted(headlineTemplate.formatted(code), expiresInMinutes, purpose, expiresAt));
 
         try {
             mailSender.send(message);
         } catch (MailException ex) {
-            log.warn("Failed to send registration verification email to {}: {}", email, ex.getMessage());
+            log.warn("Failed to send {} verification email to {}: {}", purpose, email, ex.getMessage());
             throw new VerificationEmailDeliveryException();
         }
     }

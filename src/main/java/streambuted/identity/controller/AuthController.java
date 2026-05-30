@@ -104,6 +104,46 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/password/reset")
+    public ResponseEntity<RegistrationVerificationResponse> startPasswordReset(
+        @Valid @RequestBody StartPasswordResetRequest request,
+        HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkRegistration(servletRequest, request.email());
+        RegistrationVerificationResponse response = authService.startPasswordReset(request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    @PostMapping("/password/reset/resend")
+    public ResponseEntity<RegistrationVerificationResponse> resendPasswordResetCode(
+        @Valid @RequestBody PasswordResetActionRequest request,
+        HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkVerification(servletRequest, request.attemptId(), request.email());
+        RegistrationVerificationResponse response = authService.resendPasswordResetCode(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/password/reset/verify")
+    public ResponseEntity<Void> verifyPasswordResetCode(
+        @Valid @RequestBody VerifyPasswordResetCodeRequest request,
+        HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkVerification(servletRequest, request.attemptId(), request.email());
+        authService.verifyPasswordResetCode(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/password/reset/complete")
+    public ResponseEntity<Void> completePasswordReset(
+        @Valid @RequestBody CompletePasswordResetRequest request,
+        HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkVerification(servletRequest, request.attemptId(), request.email());
+        authService.completePasswordReset(request);
+        return ResponseEntity.noContent().build();
+    }
+
     /**
      * POST /api/v1/auth/login
      * Authenticates credentials and returns an access token in body.

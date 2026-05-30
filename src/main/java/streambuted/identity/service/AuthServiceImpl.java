@@ -52,6 +52,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService             jwtService;
     private final JwtProperties          jwtProperties;
     private final RegistrationVerificationService registrationVerificationService;
+    private final PasswordResetVerificationService passwordResetVerificationService;
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
 
@@ -116,6 +117,43 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void cancelRegistration(CancelRegistrationVerificationRequest request) {
         registrationVerificationService.cancel(request);
+    }
+
+    @Override
+    public RegistrationVerificationResponse startPasswordReset(StartPasswordResetRequest request) {
+        String normalizedEmail = normalizeEmail(request.email());
+        UserAccountEntity account = resolvePrimaryAccountByEmail(normalizedEmail)
+            .orElseThrow(PasswordResetAccountNotFoundException::new);
+        return passwordResetVerificationService.startReset(account);
+    }
+
+    @Override
+    public RegistrationVerificationResponse resendPasswordResetCode(PasswordResetActionRequest request) {
+        return passwordResetVerificationService.resendCode(request);
+    }
+
+    @Override
+    public void verifyPasswordResetCode(VerifyPasswordResetCodeRequest request) {
+        passwordResetVerificationService.verifyCode(new VerifyPasswordResetCodeRequest(
+            request.attemptId(),
+            normalizeEmail(request.email()),
+            request.code()
+        ));
+    }
+
+    @Override
+    public void completePasswordReset(CompletePasswordResetRequest request) {
+        validatePasswordPolicy(request.password());
+        if (!request.password().equals(request.confirmPassword())) {
+            throw new PasswordPolicyException("Las contraseñas no coinciden.");
+        }
+
+        passwordResetVerificationService.completeReset(new CompletePasswordResetRequest(
+            request.attemptId(),
+            normalizeEmail(request.email()),
+            request.password(),
+            request.confirmPassword()
+        ));
     }
 
     // Login

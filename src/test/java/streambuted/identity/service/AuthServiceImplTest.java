@@ -49,6 +49,7 @@ class AuthServiceImplTest {
     @Mock private JwtService             jwtService;
     @Mock private JwtProperties          jwtProperties;
     @Mock private RegistrationVerificationService registrationVerificationService;
+    @Mock private PasswordResetVerificationService passwordResetVerificationService;
     @Mock private OutboxRepository outboxRepository;
     @Spy private ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
@@ -202,6 +203,60 @@ class AuthServiceImplTest {
             authService.cancelRegistration(request);
 
             verify(registrationVerificationService).cancel(request);
+        }
+    }
+
+    @Nested
+    @DisplayName("password reset")
+    class PasswordResetTests {
+
+        @Test
+        @DisplayName("should start password reset for an existing account")
+        void startPasswordReset_success() {
+            RegistrationVerificationResponse expected = new RegistrationVerificationResponse(
+                UUID.randomUUID(),
+                VALID_EMAIL,
+                "pending",
+                900L,
+                "Codigo de recuperacion enviado."
+            );
+
+            when(accountRepository.findByEmail(VALID_EMAIL)).thenReturn(Optional.of(activeAccount));
+            when(passwordResetVerificationService.startReset(activeAccount)).thenReturn(expected);
+
+            RegistrationVerificationResponse response = authService.startPasswordReset(
+                new StartPasswordResetRequest(VALID_EMAIL)
+            );
+
+            assertThat(response).isEqualTo(expected);
+        }
+
+        @Test
+        @DisplayName("should reject password reset when the email is not associated to any account")
+        void startPasswordReset_unknownEmail_throwsException() {
+            when(accountRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authService.startPasswordReset(
+                new StartPasswordResetRequest("ghost@example.com")
+            ))
+                .isInstanceOf(PasswordResetAccountNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("should reject password reset completion when confirmation does not match")
+        void completePasswordReset_confirmationMismatch_throwsException() {
+            CompletePasswordResetRequest request = new CompletePasswordResetRequest(
+                UUID.randomUUID(),
+                VALID_EMAIL,
+                "SecurePass1!",
+                "SecurePass2!"
+            );
+
+            assertThatThrownBy(() -> authService.completePasswordReset(request))
+                .isInstanceOf(PasswordPolicyException.class)
+                .hasMessageContaining("no coinciden");
+
+            verify(passwordResetVerificationService, never()).completeReset(any());
         }
     }
 
