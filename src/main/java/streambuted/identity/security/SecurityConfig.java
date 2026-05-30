@@ -101,7 +101,7 @@ public class SecurityConfig {
             )
             .addFilterBefore(
                 new DesktopAuthEnabledFilter(desktopAuthProperties, objectMapper),
-                JwtAuthenticationFilter.class
+                UsernamePasswordAuthenticationFilter.class
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
