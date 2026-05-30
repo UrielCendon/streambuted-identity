@@ -58,6 +58,7 @@ app:
   registration:
     verification-code-ttl: ${REGISTRATION_VERIFICATION_CODE_TTL:15m}
   security:
+    trust-forwarded-headers: ${TRUST_FORWARDED_HEADERS:false}
     refresh-cookie:
       path: ${REFRESH_COOKIE_PATH:/api/v1/auth/refresh}
       secure: ${REFRESH_COOKIE_SECURE:true}
@@ -67,6 +68,12 @@ app:
       client-secret: ${GOOGLE_CLIENT_SECRET:}
       callback-url: ${GOOGLE_CALLBACK_URL:http://localhost/api/v1/auth/oauth/google/callback}
       frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  desktop-auth:
+    enabled: ${DESKTOP_AUTH_ENABLED:false}
+    code-ttl-seconds: ${DESKTOP_AUTH_CODE_TTL_SECONDS:300}
+    allowed-redirect-uri: ${DESKTOP_AUTH_ALLOWED_REDIRECT_URI:streambuted://auth/callback}
+    electron-renderer-origin: ${ELECTRON_RENDERER_ORIGIN:app://streambuted}
+    web-allowed-origins: ${DESKTOP_AUTH_WEB_ALLOWED_ORIGINS:http://localhost:5173,http://localhost}
   admin:
     bootstrap:
       enabled: ${ADMIN_BOOTSTRAP_ENABLED:false}
@@ -127,3 +134,4 @@ logging:
     root: INFO
     streambuted.identity: INFO
     org.springframework.security: WARN
+    org.springframework.web: INFO
