@@ -20,7 +20,7 @@ spring:
 
 jwt:
   issuer: http://identity-service-test
-  access-token-expiry-ms: 900000
+  access-token-expiry-ms: 1800000
   refresh-token-expiry-ms: 604800000
 
 messaging:

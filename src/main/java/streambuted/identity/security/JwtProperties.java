@@ -33,7 +33,7 @@ public class JwtProperties {
     /** Optional key id to use in JWT header and JWKS (kid). If blank, derived from public key. */
     private String keyId;
 
-    /** Access token lifetime in milliseconds (default 15 min = 900_000 ms). */
+    /** Access token lifetime in milliseconds (default 30 min = 1_800_000 ms). */
     private long accessTokenExpiryMs;
 
     /** Refresh token lifetime in milliseconds (default 7 days = 604_800_000 ms). */

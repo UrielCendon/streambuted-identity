@@ -32,7 +32,7 @@ import static org.mockito.Mockito.*;
 @DisplayName("JwtService Unit Tests")
 class JwtServiceTest {
 
-    private static final long ACCESS_EXPIRY_MS  = 900_000L;  // 15 min
+    private static final long ACCESS_EXPIRY_MS  = 1_800_000L;  // 30 min
     private static final long REFRESH_EXPIRY_MS = 604_800_000L; // 7 days
 
     @Mock
@@ -206,7 +206,7 @@ class JwtServiceTest {
     @Test
     @DisplayName("getAccessTokenExpirySeconds() should convert ms to seconds correctly")
     void getAccessTokenExpirySeconds_convertsCorrectly() {
-        when(jwtProperties.getAccessTokenExpiryMs()).thenReturn(900_000L);
-        assertThat(jwtService.getAccessTokenExpirySeconds()).isEqualTo(900L);
+        when(jwtProperties.getAccessTokenExpiryMs()).thenReturn(1_800_000L);
+        assertThat(jwtService.getAccessTokenExpirySeconds()).isEqualTo(1800L);
     }
 }

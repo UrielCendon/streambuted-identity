@@ -22,7 +22,7 @@ import java.util.UUID;
  * Handles JWT issuance, parsing and validation.
  *
  * Algorithm : RSA + SHA-256 (RS256)
- * Access TTL : 15 min (configurable via jwt.access-token-expiry-ms)
+ * Access TTL : 30 min (configurable via jwt.access-token-expiry-ms)
  * Claims     : sub (userId), email, role
  * Key        : Identity holds the private key; public key is exposed via JWKS.
  */
