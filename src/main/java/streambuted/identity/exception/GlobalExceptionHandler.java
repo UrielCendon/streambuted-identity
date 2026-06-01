@@ -1,5 +1,6 @@
 package streambuted.identity.exception;
 
+import jakarta.validation.ConstraintViolation;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,6 +18,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import streambuted.identity.dto.AccountBannedErrorResponse;
 import streambuted.identity.dto.ErrorResponse;
 
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -97,9 +99,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
+        String details = sanitizeConstraintViolationMessages(ex.getConstraintViolations());
         ErrorResponse body = ErrorResponse.of(
             "ConstraintViolationException",
-            ex.getMessage(),
+            details,
             400
         );
         return ResponseEntity.badRequest().body(body);
@@ -129,7 +132,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getClass().getSimpleName());
         ErrorResponse body = ErrorResponse.of(
             "DataIntegrityViolationException",
             "La operacion viola una restriccion de datos.",
@@ -147,5 +150,15 @@ public class GlobalExceptionHandler {
             500
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    private String sanitizeConstraintViolationMessages(Set<ConstraintViolation<?>> violations) {
+        if (violations == null || violations.isEmpty()) {
+            return "La solicitud no cumple con el formato esperado.";
+        }
+
+        return violations.stream()
+            .map(ConstraintViolation::getMessage)
+            .collect(Collectors.joining("; "));
     }
 }

@@ -699,6 +699,7 @@ class AuthServiceImplTest {
             assertThatThrownBy(() -> authService.refresh(REFRESH_TOKEN))
                 .isInstanceOf(InvalidRefreshTokenException.class);
 
+            verify(refreshTokenRepository).revokeAllByAccountId(activeAccount.getId());
             verify(jwtService, never()).generateAccessToken(any());
         }
 
@@ -718,6 +719,7 @@ class AuthServiceImplTest {
             assertThatThrownBy(() -> authService.refresh(REFRESH_TOKEN))
                 .isInstanceOf(InvalidRefreshTokenException.class);
 
+            verify(refreshTokenRepository, never()).revokeAllByAccountId(any());
             verify(jwtService, never()).generateAccessToken(any());
         }
 

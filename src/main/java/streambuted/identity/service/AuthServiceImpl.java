@@ -236,6 +236,13 @@ public class AuthServiceImpl implements AuthService {
             .findByTokenValue(tokenValue)
             .orElseThrow(InvalidRefreshTokenException::new);
 
+        if (storedToken.isRevoked()) {
+            UUID accountId = storedToken.getAccount().getId();
+            refreshTokenRepository.revokeAllByAccountId(accountId);
+            log.warn("Detected refresh token reuse for userId={}. Revoked all active refresh tokens.", accountId);
+            throw new InvalidRefreshTokenException();
+        }
+
         if (!storedToken.isValid()) {
             throw new InvalidRefreshTokenException();
         }
