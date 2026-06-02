@@ -518,16 +518,32 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("should not create an account when Google login is used for an unknown email")
-        void googleLogin_unknownEmail_throwsException() {
+        @DisplayName("should create listener account when Google login email does not exist")
+        void googleLogin_unknownEmail_createsUser() {
             GoogleUserInfo googleUser = new GoogleUserInfo("google-sub-4", "google@example.com", "Google User");
             when(accountRepository.findByEmail("google@example.com")).thenReturn(Optional.empty());
+            when(profileRepository.existsByUsername("google_user")).thenReturn(false);
+            when(passwordEncoder.encode(any())).thenReturn(HASHED_PASSWORD);
+            when(accountRepository.save(any(UserAccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(jwtService.generateAccessToken(any())).thenReturn(ACCESS_TOKEN);
+            when(jwtProperties.getRefreshTokenExpiryMs()).thenReturn(604_800_000L);
+            when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jwtService.getAccessTokenExpirySeconds()).thenReturn(EXPIRY_SECONDS);
 
-            assertThatThrownBy(() -> authService.authenticateWithGoogle(googleUser, GoogleOAuthMode.LOGIN))
-                .isInstanceOf(GoogleAuthenticationException.class)
-                .hasMessageContaining("Registrate con Google primero");
+            GoogleAuthenticationResult result = authService.authenticateWithGoogle(
+                googleUser,
+                GoogleOAuthMode.LOGIN
+            );
 
-            verify(accountRepository, never()).save(any());
+            assertThat(result.loginResponse().accessToken()).isEqualTo(ACCESS_TOKEN);
+            assertThat(result.passwordSetupRequired()).isFalse();
+            verify(accountRepository).save(argThat(acc ->
+                acc.getEmail().equals("google@example.com") &&
+                acc.getGoogleSubject().equals("google-sub-4") &&
+                acc.getRole() == Role.LISTENER &&
+                !acc.isPasswordSetupRequired() &&
+                acc.getProfile().getUsername().equals("google_user")
+            ));
         }
 
         @Test

@@ -189,7 +189,6 @@ public class AuthServiceImpl implements AuthService {
 
         UserAccountEntity account = resolveGoogleAccount(
             googleUserInfo,
-            mode,
             email,
             accountBySubject,
             equivalentAccounts
@@ -445,7 +444,6 @@ public class AuthServiceImpl implements AuthService {
 
     private UserAccountEntity resolveGoogleAccount(
         GoogleUserInfo googleUserInfo,
-        GoogleOAuthMode mode,
         String normalizedEmail,
         Optional<UserAccountEntity> accountBySubject,
         List<UserAccountEntity> equivalentAccounts
@@ -462,12 +460,6 @@ public class AuthServiceImpl implements AuthService {
 
         if (accountBySubject.isPresent()) {
             return accountBySubject.get();
-        }
-
-        if (mode == GoogleOAuthMode.LOGIN) {
-            throw new GoogleAuthenticationException(
-                "No hay una cuenta vinculada a este correo. Registrate con Google primero."
-            );
         }
 
         return createGoogleAccount(googleUserInfo, normalizedEmail);
