@@ -39,7 +39,7 @@ public interface UserService {
     /**
      * Returns all accounts for the administrator moderation console.
      */
-    AdminUserListResponse listUsersForAdmin(int limit, int offset);
+    AdminUserListResponse listUsersForAdmin(int limit, int offset, String searchTerm);
 
     /**
      * Applies a temporary or permanent ban and revokes active refresh tokens.

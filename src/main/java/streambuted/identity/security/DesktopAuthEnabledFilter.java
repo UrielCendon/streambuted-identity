@@ -39,6 +39,7 @@ public class DesktopAuthEnabledFilter extends OncePerRequestFilter {
                 response.getWriter(),
                 ErrorResponse.of(
                     "DesktopAuthDisabledException",
+                    "resource_not_found",
                     "La autenticacion desktop no esta disponible.",
                     HttpStatus.NOT_FOUND.value()
                 )

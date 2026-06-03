@@ -70,7 +70,7 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
         } catch (RuntimeException ex) {
             log.warn("Unexpected Media gRPC validation failure for assetId={}", assetId, ex);
             throw ProfileUpdateException.badGateway(
-                "Media Service no pudo validar el archivo indicado."
+                "No se pudo validar la informacion relacionada con esta accion."
             );
         }
     }
@@ -99,13 +99,13 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
 
         if (!expectedAssetId.equals(responseAssetId)) {
             throw ProfileUpdateException.badGateway(
-                "Media Service devolvio metadatos de un archivo diferente."
+                "No se pudo validar la informacion relacionada con esta accion."
             );
         }
 
         if (response.getAssetType().isBlank() || response.getContentType().isBlank()) {
             throw ProfileUpdateException.badGateway(
-                "Media Service devolvio una respuesta de metadatos invalida."
+                "No se pudo validar la informacion relacionada con esta accion."
             );
         }
 
@@ -124,7 +124,7 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
             return UUID.fromString(value);
         } catch (RuntimeException ex) {
             throw ProfileUpdateException.badGateway(
-                "Media Service devolvio un campo invalido: " + fieldName + "."
+                "No se pudo validar la informacion relacionada con esta accion."
             );
         }
     }
@@ -133,7 +133,7 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
         Status.Code code = error.getStatus().getCode();
         return switch (code) {
             case UNAUTHENTICATED -> ProfileUpdateException.unauthorized(
-                "Media Service rechazo el token de autorizacion."
+                "Tu sesion expiro. Inicia sesion nuevamente."
             );
             case PERMISSION_DENIED -> ProfileUpdateException.forbidden(
                 "El archivo multimedia indicado no es accesible."
@@ -142,13 +142,13 @@ public class GrpcMediaAssetClient implements MediaAssetClient {
                 "No se encontro el archivo multimedia " + assetId + "."
             );
             case UNAVAILABLE -> ProfileUpdateException.serviceUnavailable(
-                "Media Service no esta disponible temporalmente para validar archivos."
+                "Esta funcion no esta disponible en este momento. Intenta de nuevo mas tarde."
             );
             case DEADLINE_EXCEEDED -> ProfileUpdateException.gatewayTimeout(
-                "Media Service tardo demasiado al validar el archivo indicado."
+                "La solicitud tardo demasiado y no se pudo completar. Intenta nuevamente."
             );
             default -> ProfileUpdateException.badGateway(
-                "Media Service no pudo validar el archivo indicado."
+                "No se pudo validar la informacion relacionada con esta accion."
             );
         };
     }

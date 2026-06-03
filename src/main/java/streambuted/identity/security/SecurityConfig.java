@@ -70,7 +70,8 @@ public class SecurityConfig {
                         HttpStatus.FORBIDDEN,
                         ErrorResponse.of(
                             "AccessDeniedException",
-                            "No tienes permisos para acceder a este recurso.",
+                            "forbidden",
+                            "No tienes permisos para esta accion.",
                             HttpStatus.FORBIDDEN.value()
                         )
                     )
@@ -120,7 +121,8 @@ public class SecurityConfig {
                 HttpStatus.UNAUTHORIZED,
                 ErrorResponse.of(
                     "AuthenticationException",
-                    "Falta el token Bearer o no es valido.",
+                    "unauthorized",
+                    "Tu sesion expiro. Inicia sesion nuevamente.",
                     HttpStatus.UNAUTHORIZED.value()
                 )
             );

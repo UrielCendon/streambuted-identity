@@ -132,12 +132,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public AdminUserListResponse listUsersForAdmin(int limit, int offset) {
+    public AdminUserListResponse listUsersForAdmin(int limit, int offset, String searchTerm) {
         int safeLimit = Math.max(1, Math.min(limit, 100));
         int safeOffset = Math.max(0, offset);
         PageRequest pageRequest = PageRequest.of(safeOffset / safeLimit, safeLimit);
+        String normalizedSearchTerm = normalizeAdminSearchTerm(searchTerm);
 
-        Page<UserAccountEntity> page = accountRepository.findAllForAdmin(pageRequest);
+        Page<UserAccountEntity> page = accountRepository.findAllForAdmin(normalizedSearchTerm, pageRequest);
         return new AdminUserListResponse(
             page.getContent().stream()
                 .map(this::mapToAdminResponse)
@@ -367,6 +368,15 @@ public class UserServiceImpl implements UserService {
         }
 
         String trimmed = reason.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeAdminSearchTerm(String searchTerm) {
+        if (searchTerm == null) {
+            return null;
+        }
+
+        String trimmed = searchTerm.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
 

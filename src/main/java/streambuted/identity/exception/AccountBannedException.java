@@ -41,7 +41,7 @@ public class AccountBannedException extends IdentityException {
             return "La cuenta se encuentra suspendida permanentemente.";
         }
 
-        return "La cuenta se encuentra suspendida. Se reactivara en "
+        return "La cuenta se encuentra suspendida. Se reactivará en "
             + formatRemainingTime(remainingSecondsUntil(bannedUntil))
             + ".";
     }

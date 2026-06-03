@@ -8,7 +8,13 @@ COPY services/identity-service/pom.xml ./pom.xml
 COPY services/identity-service/src ./src
 COPY contracts /build/contracts
 
-RUN mvn -B -DskipTests clean package
+RUN --mount=type=cache,target=/root/.m2 \
+    for i in 1 2 3 4 5; do \
+      mvn -U -B -DskipTests clean package && exit 0; \
+      echo "Maven falló. Reintentando en 20 segundos..."; \
+      sleep 20; \
+    done; \
+    exit 1
 
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-jammy

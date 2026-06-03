@@ -46,9 +46,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IdentityException.class)
     public ResponseEntity<ErrorResponse> handleIdentityException(IdentityException ex) {
         log.warn("Domain exception: {}", ex.getMessage());
+        String internalError = ex.getClass().getSimpleName();
+        String publicCode = PublicErrorPolicy.inferPublicCode(internalError, ex.getMessage(), ex.getHttpStatus());
         ErrorResponse body = ErrorResponse.of(
-            ex.getClass().getSimpleName(),
-            ex.getMessage(),
+            internalError,
+            publicCode,
+            PublicErrorPolicy.resolvePublicMessage(publicCode, ex.getMessage()),
             ex.getHttpStatus().value()
         );
         return ResponseEntity.status(ex.getHttpStatus()).body(body);
@@ -61,7 +64,7 @@ public class GlobalExceptionHandler {
         String details = ex.getBindingResult().getFieldErrors().stream()
             .map(FieldError::getDefaultMessage)
             .collect(Collectors.joining("; "));
-        ErrorResponse body = ErrorResponse.of("ValidationException", details, 400);
+        ErrorResponse body = ErrorResponse.of("ValidationException", "invalid_input", details, 400);
         return ResponseEntity.badRequest().body(body);
     }
 
@@ -69,6 +72,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableMessage(HttpMessageNotReadableException ex) {
         ErrorResponse body = ErrorResponse.of(
             "MalformedJsonException",
+            "invalid_input",
             "El cuerpo de la solicitud falta, esta mal formado o no se puede procesar.",
             400
         );
@@ -81,6 +85,7 @@ public class GlobalExceptionHandler {
     ) {
         ErrorResponse body = ErrorResponse.of(
             "MissingRequestParameterException",
+            "invalid_input",
             "Falta el parametro obligatorio: " + ex.getParameterName(),
             400
         );
@@ -91,6 +96,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         ErrorResponse body = ErrorResponse.of(
             "MethodArgumentTypeMismatchException",
+            "invalid_input",
             "El parametro '" + ex.getName() + "' tiene un valor no valido.",
             400
         );
@@ -102,6 +108,7 @@ public class GlobalExceptionHandler {
         String details = sanitizeConstraintViolationMessages(ex.getConstraintViolations());
         ErrorResponse body = ErrorResponse.of(
             "ConstraintViolationException",
+            "invalid_input",
             details,
             400
         );
@@ -114,7 +121,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex) {
         ErrorResponse body = ErrorResponse.of(
             "AuthenticationException",
-            "Falta el token Bearer o no es valido.",
+            "unauthorized",
+            "Tu sesion expiro. Inicia sesion nuevamente.",
             401
         );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
@@ -124,7 +132,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
         ErrorResponse body = ErrorResponse.of(
             "AccessDeniedException",
-            "No tienes permisos para acceder a este recurso.",
+            "forbidden",
+            "No tienes permisos para esta accion.",
             403
         );
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
@@ -135,7 +144,8 @@ public class GlobalExceptionHandler {
         log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getClass().getSimpleName());
         ErrorResponse body = ErrorResponse.of(
             "DataIntegrityViolationException",
-            "La operacion viola una restriccion de datos.",
+            "conflict_or_state_changed",
+            "El contenido cambio y no se pudo completar la accion. Intenta nuevamente.",
             409
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
@@ -146,7 +156,8 @@ public class GlobalExceptionHandler {
         log.error("Unhandled exception", ex);
         ErrorResponse body = ErrorResponse.of(
             "InternalServerError",
-            "Ocurrio un error interno. Intenta de nuevo mas tarde.",
+            "unexpected_operation_failure",
+            "No se pudo completar la accion en este momento. Intenta de nuevo mas tarde.",
             500
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
