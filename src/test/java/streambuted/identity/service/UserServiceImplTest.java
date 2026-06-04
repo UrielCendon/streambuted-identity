@@ -7,8 +7,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import streambuted.identity.domain.*;
+import streambuted.identity.dto.AdminUserListResponse;
 import streambuted.identity.dto.UpdateUserProfileRequest;
 import streambuted.identity.dto.UserProfileResponse;
 import streambuted.identity.exception.*;
@@ -16,6 +19,7 @@ import streambuted.identity.media.MediaAssetClient;
 import streambuted.identity.media.MediaAssetMetadata;
 import streambuted.identity.repository.*;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -77,6 +81,7 @@ class UserServiceImplTest {
             .username("listeneruser")
             .bio("A music lover")
             .build();
+        listenerAccount.setProfile(profile);
     }
 
     @Nested
@@ -108,6 +113,52 @@ class UserServiceImplTest {
             assertThatThrownBy(() -> userService.getProfile(unknownId))
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessageContaining("El usuario solicitado no existe");
+        }
+    }
+
+    @Nested
+    @DisplayName("listUsersForAdmin()")
+    class ListUsersForAdminTests {
+
+        @Test
+        @DisplayName("should use the unfiltered repository query when search term is null")
+        void listUsersForAdmin_nullSearch_usesUnfilteredQuery() {
+            PageRequest pageRequest = PageRequest.of(0, 10);
+            when(accountRepository.findAllForAdmin(pageRequest))
+                .thenReturn(new PageImpl<>(List.of(listenerAccount), pageRequest, 1));
+
+            AdminUserListResponse response = userService.listUsersForAdmin(10, 0, null);
+
+            assertThat(response.data()).hasSize(1);
+            assertThat(response.data().get(0).email()).isEqualTo("listener@example.com");
+            verify(accountRepository).findAllForAdmin(pageRequest);
+            verify(accountRepository, never()).searchAllForAdmin(anyString(), any());
+        }
+
+        @Test
+        @DisplayName("should use the unfiltered repository query when search term is blank")
+        void listUsersForAdmin_blankSearch_usesUnfilteredQuery() {
+            PageRequest pageRequest = PageRequest.of(0, 10);
+            when(accountRepository.findAllForAdmin(pageRequest))
+                .thenReturn(new PageImpl<>(List.of(listenerAccount), pageRequest, 1));
+
+            userService.listUsersForAdmin(10, 0, "   ");
+
+            verify(accountRepository).findAllForAdmin(pageRequest);
+            verify(accountRepository, never()).searchAllForAdmin(anyString(), any());
+        }
+
+        @Test
+        @DisplayName("should trim search terms before using the filtered repository query")
+        void listUsersForAdmin_searchTerm_usesFilteredQuery() {
+            PageRequest pageRequest = PageRequest.of(2, 10);
+            when(accountRepository.searchAllForAdmin("artist", pageRequest))
+                .thenReturn(new PageImpl<>(List.of(listenerAccount), pageRequest, 1));
+
+            userService.listUsersForAdmin(10, 20, " artist ");
+
+            verify(accountRepository).searchAllForAdmin("artist", pageRequest);
+            verify(accountRepository, never()).findAllForAdmin(any(PageRequest.class));
         }
     }
 

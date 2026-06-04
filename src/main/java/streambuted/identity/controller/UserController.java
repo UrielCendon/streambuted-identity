@@ -78,9 +78,11 @@ public class UserController {
     public ResponseEntity<AdminUserListResponse> listUsersForAdmin(
         @RequestParam(name = "limit", defaultValue = "50") int limit,
         @RequestParam(name = "offset", defaultValue = "0") int offset,
-        @RequestParam(name = "q", required = false) String searchTerm
+        @RequestParam(name = "q", required = false) String q,
+        @RequestParam(name = "searchTerm", required = false) String searchTerm
     ) {
-        return ResponseEntity.ok(userService.listUsersForAdmin(limit, offset, searchTerm));
+        String effectiveSearchTerm = q != null ? q : searchTerm;
+        return ResponseEntity.ok(userService.listUsersForAdmin(limit, offset, effectiveSearchTerm));
     }
 
     @PatchMapping("/admin/{targetUserId}/ban")

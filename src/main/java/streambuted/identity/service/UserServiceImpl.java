@@ -138,7 +138,9 @@ public class UserServiceImpl implements UserService {
         PageRequest pageRequest = PageRequest.of(safeOffset / safeLimit, safeLimit);
         String normalizedSearchTerm = normalizeAdminSearchTerm(searchTerm);
 
-        Page<UserAccountEntity> page = accountRepository.findAllForAdmin(normalizedSearchTerm, pageRequest);
+        Page<UserAccountEntity> page = normalizedSearchTerm == null
+            ? accountRepository.findAllForAdmin(pageRequest)
+            : accountRepository.searchAllForAdmin(normalizedSearchTerm, pageRequest);
         return new AdminUserListResponse(
             page.getContent().stream()
                 .map(this::mapToAdminResponse)

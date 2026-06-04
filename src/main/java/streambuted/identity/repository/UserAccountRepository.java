@@ -29,6 +29,16 @@ public interface UserAccountRepository extends JpaRepository<UserAccountEntity, 
 
     @EntityGraph(attributePaths = "profile")
     @Query(
+        """
+            SELECT account
+            FROM UserAccountEntity account
+            ORDER BY account.createdAt DESC
+            """
+    )
+    Page<UserAccountEntity> findAllForAdmin(Pageable pageable);
+
+    @EntityGraph(attributePaths = "profile")
+    @Query(
         value = """
             SELECT account
             FROM UserAccountEntity account
@@ -51,5 +61,5 @@ public interface UserAccountRepository extends JpaRepository<UserAccountEntity, 
             )
             """
     )
-    Page<UserAccountEntity> findAllForAdmin(@Param("searchTerm") String searchTerm, Pageable pageable);
+    Page<UserAccountEntity> searchAllForAdmin(@Param("searchTerm") String searchTerm, Pageable pageable);
 }
