@@ -10,6 +10,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import streambuted.identity.dto.AdminUserListResponse;
 import streambuted.identity.dto.PaginationResponse;
+import streambuted.identity.security.JwtService;
 import streambuted.identity.service.UserService;
 
 import java.util.List;
@@ -29,6 +30,9 @@ class UserControllerTest {
 
     @MockBean
     private UserService userService;
+
+    @MockBean
+    private JwtService jwtService;
 
     @Test
     @WithMockUser(roles = "ADMIN")
