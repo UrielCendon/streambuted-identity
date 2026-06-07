@@ -2,6 +2,9 @@ package streambuted.identity.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
@@ -17,6 +20,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/auth/desktop")
 @RequiredArgsConstructor
+@Tag(name = "Desktop Auth", description = "Login, refresh, logout y handoff para cliente desktop.")
 public class DesktopAuthController {
 
     private final AuthService authService;
@@ -51,6 +55,7 @@ public class DesktopAuthController {
     }
 
     @PostMapping("/handoff-codes")
+    @Operation(security = @SecurityRequirement(name = "BearerAuth"))
     public ResponseEntity<DesktopHandoffCodeResponse> createHandoffCode(
         @AuthenticationPrincipal UUID userId,
         @Valid @RequestBody DesktopHandoffCodeRequest request,

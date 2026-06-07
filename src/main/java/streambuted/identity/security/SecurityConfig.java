@@ -78,6 +78,13 @@ public class SecurityConfig {
                 )
             )
             .authorizeHttpRequests(auth -> auth
+                // Living API documentation
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/v1/identity/docs",
+                    "/api/v1/identity/docs/swagger-ui.js",
+                    "/api/v1/identity/openapi.json"
+                ).permitAll()
                 // Public auth endpoints
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/register/resend").permitAll()

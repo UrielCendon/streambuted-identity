@@ -5,6 +5,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
@@ -37,6 +40,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Authentication", description = "Registro, login, refresh, OAuth Google y claves JWKS.")
 public class AuthController {
 
     private static final String REFRESH_COOKIE_NAME = "refresh_token";
@@ -191,6 +195,7 @@ public class AuthController {
     }
 
     @GetMapping("/validate")
+    @Operation(security = @SecurityRequirement(name = "BearerAuth"))
     public ResponseEntity<ValidatedTokenResponse> validateAccessToken(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader
     ) {
@@ -272,6 +277,7 @@ public class AuthController {
     }
 
     @PostMapping("/password/setup")
+    @Operation(security = @SecurityRequirement(name = "BearerAuth"))
     public ResponseEntity<Void> completeGooglePasswordSetup(
         @AuthenticationPrincipal UUID userId,
         @Valid @RequestBody SetupPasswordRequest request

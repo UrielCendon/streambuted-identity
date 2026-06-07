@@ -51,6 +51,12 @@ spring:
           timeout: ${EMAIL_READ_TIMEOUT_MS:5000}
           writetimeout: ${EMAIL_WRITE_TIMEOUT_MS:5000}
 
+springdoc:
+  api-docs:
+    path: /api/v1/identity/openapi.json
+  swagger-ui:
+    enabled: false
+
 app:
   email:
     from: ${EMAIL_FROM:no-reply-streambuted@example.com}
