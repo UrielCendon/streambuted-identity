@@ -1,6 +1,8 @@
 package streambuted.identity.controller;
 
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +29,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Users", description = "Perfil autenticado, promocion a artista y administracion de usuarios.")
+@SecurityRequirement(name = "BearerAuth")
 public class UserController {
 
     private final UserService userService;
